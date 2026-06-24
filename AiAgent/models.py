@@ -1,18 +1,6 @@
-from pydantic import BaseModel
-from typing import Optional
-
-class SpO2Data(BaseModel):
-    patient_name: str
-    spo2_value: float
-    heart_rate: int
-    timestamp: str
-    patient_age: Optional[int] = None
-
-class AgentResponse(BaseModel):
-    patient_name: str
-    spo2_value: float
-    heart_rate: int
-    condition: str  # Normal, Sedang, Bahaya
-    explanation: str
-    tips: str
-    timestamp: str
+"""
+models.py
+Catatan: file ini sekarang opsional karena schema sudah didefinisikan
+langsung di main.py (PredictRequest, RecommendationRequest).
+Dibiarkan kosong/minimal supaya tidak ada import lama yang error.
+"""
