@@ -1,12 +1,53 @@
-// widgets/trend_chart.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
+import '../services/ai_scoring_service.dart';
 import '../utils/languages.dart';
 
-class TrendChart extends StatelessWidget {
+class TrendChart extends StatefulWidget {
   const TrendChart({super.key});
+
+  @override
+  State<TrendChart> createState() => _TrendChartState();
+}
+
+class _TrendChartState extends State<TrendChart> {
+  List<Map<String, dynamic>> _dailyData = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _generateMockData();
+  }
+
+  void _generateMockData() {
+    // 🔥 Data dummy hanya 5 log terakhir
+    _dailyData = [
+      {'time': '10:00', 'spo2': 89.0, 'hr': 162.0, 'status': 'bahaya'},
+      {'time': '12:00', 'spo2': 96.0, 'hr': 115.0, 'status': 'waspada'},
+      {'time': '15:00', 'spo2': 99.0, 'hr': 100.0, 'status': 'normal'},
+      {'time': '18:00', 'spo2': 94.0, 'hr': 122.0, 'status': 'waspada'},
+      {'time': '21:00', 'spo2': 97.0, 'hr': 108.0, 'status': 'normal'},
+    ];
+
+    // Hitung status menggunakan AI scoring
+    final auth = context.read<AuthProvider>();
+    final age = int.tryParse(auth.usia) ?? 3;
+
+    for (var data in _dailyData) {
+      final result = AIScoringService.predict(
+        age: age,
+        weight: 14.0,
+        height: 95.0,
+        spo2: data['spo2'] as double,
+        hr: data['hr'] as double,
+      );
+      data['level'] = result['level'];
+      data['score'] = result['score'];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,25 +55,17 @@ class TrendChart extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final isProfileEmpty = auth.nama.isEmpty && auth.usia.isEmpty;
 
-    // Data dummy untuk 10 log terakhir
-    final List<Map<String, dynamic>> dailyData = [
-      {'time': '00:00', 'spo2': 98.0, 'hr': 99.0, 'status': 'normal'},
-      {'time': '03:00', 'spo2': 97.0, 'hr': 95.0, 'status': 'normal'},
-      {'time': '06:00', 'spo2': 98.0, 'hr': 105.0, 'status': 'normal'},
-      {'time': '09:00', 'spo2': 97.0, 'hr': 110.0, 'status': 'normal'},
-      {'time': '10:00', 'spo2': 89.0, 'hr': 162.0, 'status': 'critical'},
-      {'time': '12:00', 'spo2': 96.0, 'hr': 115.0, 'status': 'warning'},
-      {'time': '15:00', 'spo2': 99.0, 'hr': 100.0, 'status': 'normal'},
-      {'time': '18:00', 'spo2': 94.0, 'hr': 122.0, 'status': 'warning'},
-      {'time': '21:00', 'spo2': 97.0, 'hr': 108.0, 'status': 'normal'},
-      {'time': '23:00', 'spo2': 98.0, 'hr': 103.0, 'status': 'normal'},
-    ];
+    if (_dailyData.isEmpty) {
+      _generateMockData();
+    }
 
-    // Hitung statistik
-    final spo2Values = dailyData.map((e) => (e['spo2'] as num).toDouble()).toList();
-    final hrValues = dailyData.map((e) => (e['hr'] as num).toDouble()).toList();
+    // 🔥 Hitung statistik dari 5 data terakhir
+    final spo2Values = _dailyData.map((e) => (e['spo2'] as num).toDouble()).toList();
+    final hrValues = _dailyData.map((e) => (e['hr'] as num).toDouble()).toList();
     final avgSpo2 = spo2Values.reduce((a, b) => a + b) / spo2Values.length;
-    final alertCount = dailyData.where((e) => e['status'] == 'warning' || e['status'] == 'critical').length;
+    final alertCount = _dailyData
+        .where((e) => e['status'] == 'waspada' || e['status'] == 'bahaya')
+        .length;
     final avgHr = hrValues.reduce((a, b) => a + b) / hrValues.length;
 
     return Container(
@@ -56,7 +89,7 @@ class TrendChart extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '10 ${lang.logPengukuran} ${lang.terakhir}',
+                '5 ${lang.logPengukuran} ${lang.terakhir}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -82,7 +115,7 @@ class TrendChart extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          // Stats mini - hanya tampil jika ada profil
+          // Stats mini
           if (!isProfileEmpty)
             Row(
               children: [
@@ -92,7 +125,7 @@ class TrendChart extends StatelessWidget {
               ],
             ),
           const SizedBox(height: 12),
-          // Chart
+          // 🔥 Chart dengan 5 data
           if (isProfileEmpty)
             _buildEmptyChart(lang)
           else
@@ -119,11 +152,11 @@ class TrendChart extends StatelessWidget {
                         reservedSize: 24,
                         getTitlesWidget: (value, meta) {
                           final index = value.toInt();
-                          if (index < 0 || index >= dailyData.length) return const Text('');
+                          if (index < 0 || index >= _dailyData.length) return const Text('');
                           return Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              dailyData[index]['time'] as String,
+                              _dailyData[index]['time'] as String,
                               style: const TextStyle(fontSize: 8, color: Colors.grey),
                             ),
                           );
@@ -154,29 +187,29 @@ class TrendChart extends StatelessWidget {
                     border: Border.all(color: Colors.grey.withOpacity(0.2)),
                   ),
                   minX: 0,
-                  maxX: dailyData.length - 1,
+                  maxX: _dailyData.length - 1,
                   minY: 70,
                   maxY: 170,
                   lineBarsData: [
-                    // SpO2 Line (Biru)
+                    // SpO2 Line
                     LineChartBarData(
-                      spots: dailyData.asMap().entries.map((entry) {
+                      spots: _dailyData.asMap().entries.map((entry) {
                         return FlSpot(entry.key.toDouble(), entry.value['spo2'] as double);
                       }).toList(),
                       isCurved: true,
                       color: const Color(0xFF4FC3F7),
-                      barWidth: 2,
+                      barWidth: 2.5,
                       isStrokeCapRound: true,
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (spot, percent, barData, index) {
-                          final dataPoint = dailyData[index];
+                          final dataPoint = _dailyData[index];
                           Color dotColor;
                           switch (dataPoint['status']) {
-                            case 'critical':
+                            case 'bahaya':
                               dotColor = Colors.red;
                               break;
-                            case 'warning':
+                            case 'waspada':
                               dotColor = Colors.orange;
                               break;
                             default:
@@ -192,25 +225,25 @@ class TrendChart extends StatelessWidget {
                       ),
                       belowBarData: BarAreaData(show: false),
                     ),
-                    // HR Line (Hijau)
+                    // HR Line
                     LineChartBarData(
-                      spots: dailyData.asMap().entries.map((entry) {
+                      spots: _dailyData.asMap().entries.map((entry) {
                         return FlSpot(entry.key.toDouble(), entry.value['hr'] as double);
                       }).toList(),
                       isCurved: true,
                       color: const Color(0xFF22C55E),
-                      barWidth: 2,
+                      barWidth: 2.5,
                       isStrokeCapRound: true,
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (spot, percent, barData, index) {
-                          final dataPoint = dailyData[index];
+                          final dataPoint = _dailyData[index];
                           Color dotColor;
                           switch (dataPoint['status']) {
-                            case 'critical':
+                            case 'bahaya':
                               dotColor = Colors.red;
                               break;
-                            case 'warning':
+                            case 'waspada':
                               dotColor = Colors.orange;
                               break;
                             default:
@@ -226,11 +259,11 @@ class TrendChart extends StatelessWidget {
                       ),
                       belowBarData: BarAreaData(show: false),
                     ),
-                    // Average Line (Merah Putus-putus)
+                    // Average Line
                     LineChartBarData(
                       spots: [
                         FlSpot(0, avgSpo2),
-                        FlSpot(dailyData.length - 1, avgSpo2),
+                        FlSpot(_dailyData.length - 1, avgSpo2),
                       ],
                       isCurved: false,
                       color: Colors.red,
@@ -245,7 +278,7 @@ class TrendChart extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 4),
-          // Legend - hanya tampil jika ada profil
+          // Legend
           if (!isProfileEmpty)
             Wrap(
               alignment: WrapAlignment.center,
@@ -380,7 +413,6 @@ class TrendChart extends StatelessWidget {
   }
 }
 
-// ========== DASHED LINE LEGEND PAINTER ==========
 class DashedLineLegendPainter extends CustomPainter {
   final Color color;
 

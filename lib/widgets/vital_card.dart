@@ -1,5 +1,5 @@
-// widgets/vital_card.dart
 import 'package:flutter/material.dart';
+import '../services/ai_scoring_service.dart';
 
 class VitalCard extends StatelessWidget {
   final String title;
@@ -8,6 +8,7 @@ class VitalCard extends StatelessWidget {
   final String status;
   final Color statusColor;
   final IconData icon;
+  final String? statusDetail;
 
   const VitalCard({
     super.key,
@@ -17,7 +18,39 @@ class VitalCard extends StatelessWidget {
     required this.status,
     required this.statusColor,
     required this.icon,
+    this.statusDetail,
   });
+
+  factory VitalCard.fromPrediction({
+    required String title,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required String status,
+    required String statusDetail,
+  }) {
+    Color statusColor;
+    switch (status) {
+      case 'bahaya':
+        statusColor = Colors.red;
+        break;
+      case 'waspada':
+        statusColor = Colors.orange;
+        break;
+      default:
+        statusColor = Colors.green;
+    }
+
+    return VitalCard(
+      title: title,
+      value: value,
+      unit: unit,
+      status: status,
+      statusColor: statusColor,
+      icon: icon,
+      statusDetail: statusDetail,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +122,16 @@ class VitalCard extends StatelessWidget {
               ),
             ],
           ),
+          if (statusDetail != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              statusDetail!,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
         ],
       ),
     );
