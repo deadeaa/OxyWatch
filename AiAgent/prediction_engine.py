@@ -20,17 +20,19 @@ class PredictionResult(TypedDict):
     tips: List[str]
 
 
-# PLACEHOLDER — ganti dengan tabel resmi dari Medical Student
+# Sumber: PALS Guidelines 2015 (Pediatric Advanced Life Support)
+# Nilai saat anak dalam kondisi awake/aktif
 HR_REFERENCE = {
-    2: (80, 130),
-    3: (80, 125),
-    4: (80, 120),
-    5: (75, 115),
+    2: (98, 140),  # Toddler
+    3: (80, 120),  # Preschool
+    4: (80, 120),  # Preschool
+    5: (80, 120),  # Preschool
 }
+
 HR_DEFAULT_RANGE = (80, 120)
 
-SPO2_NORMAL_MIN = 95
-SPO2_WASPADA_MIN = 91
+SPO2_NORMAL_MIN = 95   # tetap sama
+SPO2_WASPADA_MIN = 92  # update dari 91 -> 92 (sesuai standar klinis umum)
 
 
 def _classify_spo2(spo2: float) -> str:
