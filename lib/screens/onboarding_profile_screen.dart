@@ -1,10 +1,11 @@
-// screens/onboarding_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;  // 🔥 ALIAS
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../providers/auth_provider.dart';  // 🔥 INI AUTH PROVIDER KITA
+import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 import '../utils/languages.dart';
+import '../config/app_colors.dart';
 
 class OnboardingProfileScreen extends StatefulWidget {
   const OnboardingProfileScreen({super.key});
@@ -36,17 +37,14 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   bool _isConnecting = false;
   String _selectedDevice = '';
 
-  // Firebase - pake alias
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Daftar Golongan Darah
   final List<String> _goldarOptions = [
     'A+', 'A-', 'B+', 'B-',
     'O+', 'O-', 'AB+', 'AB-'
   ];
 
-  // Daftar perangkat Bluetooth dummy
   final List<Map<String, String>> _bluetoothDevices = [
     {'name': 'Galaxy Watch 4', 'address': 'XX:XX:XX:XX:XX:01'},
     {'name': 'Xiaomi Mi Band 7', 'address': 'XX:XX:XX:XX:XX:02'},
@@ -97,45 +95,52 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   }) async {
     final lang = AppLocalizations.of(context)!;
 
-    // Validasi
-    if (!_isValidName(_namaController.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(lang.namaMinimal2),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+    if (_namaController.text.trim().isNotEmpty) {
+      if (!_isValidName(_namaController.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.namaMinimal2),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
     }
 
-    if (!_isNumeric(_usiaController.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(lang.usiaHarusAngka),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+    if (_usiaController.text.trim().isNotEmpty) {
+      if (!_isNumeric(_usiaController.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.usiaHarusAngka),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
     }
 
-    if (!_isNumeric(_bbController.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(lang.bbHarusAngka),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+    if (_bbController.text.trim().isNotEmpty) {
+      if (!_isNumeric(_bbController.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.bbHarusAngka),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
     }
 
-    if (!_isNumeric(_tbController.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(lang.tbHarusAngka),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
+    if (_tbController.text.trim().isNotEmpty) {
+      if (!_isNumeric(_tbController.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(lang.tbHarusAngka),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
@@ -146,10 +151,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         throw Exception('User not logged in');
       }
 
-      // Generate patient ID
       final String patientId = 'PED-${DateTime.now().millisecondsSinceEpoch.toString().substring(7, 12)}';
 
-      // Data profil
       final profileData = {
         'uid': user.uid,
         'nama': _namaController.text.trim(),
@@ -169,13 +172,11 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Simpan ke Firestore
       await _firestore.collection('users').doc(user.uid).set(
         profileData,
         SetOptions(merge: true),
       );
 
-      // Update AuthProvider
       final authProvider = context.read<AuthProvider>();
       authProvider.setProfile(
         nama: _namaController.text.trim(),
@@ -196,7 +197,6 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
       authProvider.setProfileCompleted(true);
 
-      // Navigasi ke dashboard
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/main');
       }
@@ -236,7 +236,6 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
       final authProvider = context.read<AuthProvider>();
 
-      // Data kosong untuk skip
       final profileData = {
         'uid': user.uid,
         'nama': '',
@@ -295,6 +294,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
   // ========== BLUETOOTH PICKER ==========
   void _showBluetoothPicker() {
+    final lang = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -318,11 +318,11 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      'Pilih Perangkat Bluetooth',
-                      style: TextStyle(
+                      lang.pilihPerangkat,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1B3A5C),
@@ -332,17 +332,17 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                   const Divider(color: Color(0xFFF1F5F9), thickness: 1),
                   ListTile(
                     leading: const Icon(Icons.search, color: Color(0xFF4FC3F7)),
-                    title: const Text(
-                      'Cari Perangkat Baru',
-                      style: TextStyle(
+                    title: Text(
+                      lang.cariPerangkatBaru,
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1B3A5C),
                       ),
                     ),
-                    subtitle: const Text(
-                      'Scan untuk mencari perangkat terdekat',
-                      style: TextStyle(
+                    subtitle: Text(
+                      lang.scanPerangkat,
+                      style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF94A3B8),
                       ),
@@ -391,6 +391,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   }
 
   void _showScanningDialog() {
+    final lang = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -404,9 +405,9 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
           children: [
             const CircularProgressIndicator(color: Color(0xFF4FC3F7)),
             const SizedBox(height: 16),
-            const Text(
-              'Mencari perangkat...',
-              style: TextStyle(
+            Text(
+              lang.mencari,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF1B3A5C),
@@ -414,7 +415,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pastikan Bluetooth aktif',
+              lang.pastikanBluetooth,
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade500,
@@ -435,7 +436,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text('Batal'),
+                child: Text(lang.batal),
               ),
             ),
           ],
@@ -453,13 +454,32 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = AppLocalizations.of(context)!;
+    final languageProvider = context.watch<LanguageProvider>();
+    final currentLang = languageProvider.currentLanguage;
+    final authProvider = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: Text(lang.lengkapiProfil),
-        backgroundColor: const Color(0xFF1B3A5C),
+        backgroundColor: AppColors.primary,
         actions: [
+          // Language toggle
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                _buildLangButton('id', 'ID', currentLang, context),
+                _buildLangButton('en', 'EN', currentLang, context),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
           TextButton(
             onPressed: _isLoading ? null : _skip,
             child: Text(
@@ -514,6 +534,40 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     );
   }
 
+  Widget _buildLangButton(
+      String code,
+      String label,
+      String currentLang,
+      BuildContext context,
+      ) {
+    final isSelected = currentLang == code;
+    final languageProvider = context.read<LanguageProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    return GestureDetector(
+      onTap: () {
+        languageProvider.setLanguage(code);
+        authProvider.updateUserLanguage(code);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.6),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ... (rest of the code remains the same as previous)
   Widget _buildStepIndicator(int index, String label) {
     bool isActive = _currentStep == index;
     bool isDone = _currentStep > index;
@@ -725,37 +779,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: () {
-              if (!_isValidName(_namaController.text.trim())) {
+              if (_namaController.text.trim().isNotEmpty && !_isValidName(_namaController.text.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(lang.namaMinimal2),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                return;
-              }
-              if (!_isNumeric(_usiaController.text.trim())) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(lang.usiaHarusAngka),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                return;
-              }
-              if (!_isNumeric(_bbController.text.trim())) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(lang.bbHarusAngka),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                return;
-              }
-              if (!_isNumeric(_tbController.text.trim())) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(lang.tbHarusAngka),
                     backgroundColor: Colors.orange,
                   ),
                 );

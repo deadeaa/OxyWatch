@@ -1,4 +1,3 @@
-// services/auth_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -28,7 +27,6 @@ class AuthService {
     try {
       debugPrint("========== REGISTER START ==========");
 
-      // STEP 1: Create user di Firebase Auth
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
@@ -41,15 +39,12 @@ class AuthService {
 
       debugPrint("STEP 1 ✓ Firebase Auth Success");
 
-      // STEP 2: Update display name
       await firebaseUser.updateDisplayName(fullName);
       debugPrint("STEP 2 ✓ Display Name Updated");
 
-      // STEP 3: Generate user code
       final userCode = await _codeGeneratorService.generateUserCode(role);
       debugPrint("STEP 3 ✓ User Code: $userCode");
 
-      // STEP 4: Create UserModel
       final user = UserModel(
         uid: firebaseUser.uid,
         userCode: userCode,
@@ -60,7 +55,6 @@ class AuthService {
       );
       debugPrint("STEP 4 ✓ UserModel Created");
 
-      // STEP 5: Save to Firestore
       await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
@@ -104,7 +98,6 @@ class AuthService {
 
       debugPrint("STEP 1 ✓ Firebase Auth Success");
 
-      // Ambil data dari Firestore
       final snapshot = await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
@@ -167,12 +160,42 @@ class AuthService {
     }
   }
 
+  Future<Map<String, dynamic>?> getUserDataMap(String uid) async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (!snapshot.exists) return null;
+      return snapshot.data();
+    } catch (e) {
+      debugPrint("Error getting user data map: $e");
+      return null;
+    }
+  }
+
   // ==========================
   // UPDATE USER DATA
   // ==========================
 
   Future<void> updateUserData(String uid, Map<String, dynamic> data) async {
     await _firestore.collection('users').doc(uid).update(data);
+  }
+
+  // ==========================
+  // DELETE USER DATA
+  // ==========================
+
+  Future<void> deleteUserData(String uid) async {
+    await _firestore.collection('users').doc(uid).delete();
+  }
+
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await user.delete();
+    }
   }
 
   // ==========================

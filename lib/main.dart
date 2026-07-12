@@ -1,4 +1,3 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +22,7 @@ import 'screens/doctor_dashboard_screen.dart';
 import 'screens/register_screen.dart';
 import 'utils/languages.dart';
 import 'screens/role_selection_screen.dart';
+import 'screens/doctor_login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,11 +57,12 @@ class MyApp extends StatelessWidget {
           title: 'OxyWatch',
           debugShowCheckedModeBanner: false,
           locale: Locale(languageProvider.currentLanguage),
-          supportedLocales: const [Locale('id'), Locale('en')],
+          supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
           ],
           theme: ThemeData(
             primaryColor: const Color(0xFF1B3A5C),
@@ -110,7 +111,7 @@ class MyApp extends StatelessWidget {
                     Navigator.pushReplacementNamed(context, '/onboarding');
                   }
                 } else {
-                  Navigator.pushReplacementNamed(context, '/login');
+                  Navigator.pushReplacementNamed(context, '/role-selection');
                 }
               },
               onBack: () {
@@ -121,12 +122,16 @@ class MyApp extends StatelessWidget {
             '/emergency': (context) => const EmergencyMonitorScreen(),
             '/onboarding': (context) => const OnboardingProfileScreen(),
             '/login': (context) => const LoginScreen(),
-            // 🔥 FIX: tambahkan role parameter
+            '/role-selection': (context) => const RoleSelectionScreen(),
+            '/doctor-login': (context) => DoctorLoginScreen(
+              onBack: () {
+                Navigator.pop(context);
+              },
+            ),
             '/register': (context) => const RegisterScreen(role: 'parent'),
+            '/register-doctor': (context) => const RegisterScreen(role: 'doctor'),
             '/parent': (context) => const DashboardScreen(),
             '/doctor': (context) => const DoctorDashboard(),
-            // main.dart - tambahkan route
-            '/role-selection': (context) => const RoleSelectionScreen(),
           },
         );
       },

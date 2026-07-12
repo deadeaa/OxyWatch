@@ -1,4 +1,3 @@
-// screens/pengaturan_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -13,6 +12,8 @@ class PengaturanScreen extends StatefulWidget {
 }
 
 class _PengaturanScreenState extends State<PengaturanScreen> {
+  bool _isLoading = false;
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -46,7 +47,11 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
         backgroundColor: const Color(0xFF1B3A5C),
         elevation: 0,
       ),
-      body: ListView(
+      body: _isLoading
+          ? const Center(
+        child: CircularProgressIndicator(color: Color(0xFF4FC3F7)),
+      )
+          : ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ========== HEADER PROFIL ==========
@@ -67,7 +72,8 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: isProfileEmpty ? Colors.grey.shade300 : const Color(0xFF1B3A5C),
+                  backgroundColor:
+                  isProfileEmpty ? Colors.grey.shade300 : const Color(0xFF1B3A5C),
                   child: Text(
                     isProfileEmpty ? '?' : initials,
                     style: TextStyle(
@@ -203,8 +209,8 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
                       ),
                       child: Row(
                         children: [
-                          _buildLanguageButton('id', 'ID', languageProvider, context),
-                          _buildLanguageButton('en', 'EN', languageProvider, context),
+                          _buildLanguageButton('id', 'ID', languageProvider, context, auth),
+                          _buildLanguageButton('en', 'EN', languageProvider, context, auth),
                         ],
                       ),
                     ),
@@ -239,6 +245,42 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           ),
           const SizedBox(height: 16),
 
+          // ========== BUTTON LOGOUT ==========
+          Container(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                _showLogoutConfirmation(context, lang);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: const Color(0xFFEF4444),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                ),
+                elevation: 0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.logout, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Logout',
+                    style: const TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
           // ========== HAPUS PROFIL ==========
           Container(
             width: double.infinity,
@@ -256,13 +298,20 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
                 ),
                 elevation: 0,
               ),
-              child: Text(
-                lang.hapusProfil,
-                style: const TextStyle(
-                  color: Color(0xFFEF4444),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.delete_outline, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    lang.hapusProfil,
+                    style: const TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -273,20 +322,25 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
   }
 
   // ========== LANGUAGE BUTTON ==========
-  Widget _buildLanguageButton(String code, String label, LanguageProvider lang, BuildContext context) {
+  Widget _buildLanguageButton(
+      String code,
+      String label,
+      LanguageProvider lang,
+      BuildContext context,
+      AuthProvider auth,
+      ) {
     final isSelected = lang.currentLanguage == code;
     return GestureDetector(
       onTap: () {
         lang.setLanguage(code);
-        // 🔥 MODERN SNACKBAR
+        // 🔥 Save to Firebase
+        auth.updateUserLanguage(code);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                Icon(
-                  code == 'id' ? Icons.translate : Icons.translate,
-                  color: Colors.white,
-                ),
+                const Icon(Icons.translate, color: Colors.white),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -371,7 +425,92 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     );
   }
 
-  // ========== DELETE CONFIRMATION (MODERN) ==========
+  // ========== LOGOUT CONFIRMATION ==========
+  void _showLogoutConfirmation(BuildContext context, AppLocalizations lang) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.logout,
+                color: Colors.orange,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Logout',
+              style: TextStyle(
+                color: Color(0xFF1B3A5C),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin logout?',
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              lang.batal,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AuthProvider>().logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Logout',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
+  // ========== DELETE CONFIRMATION ==========
   void _showDeleteConfirmation(BuildContext context, AppLocalizations lang) {
     showDialog(
       context: context,
@@ -434,7 +573,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      lang.belumAdaProfil,
+                      'Semua data akan dihapus permanen',
                       style: TextStyle(
                         color: Colors.red.shade700,
                         fontSize: 12,
@@ -464,33 +603,48 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              context.read<AuthProvider>().logout();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.white),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          lang.profilDihapus,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
+              setState(() => _isLoading = true);
+
+              try {
+                await context.read<AuthProvider>().deleteProfile();
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.white),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              lang.profilDihapus,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Gagal menghapus profil: $e'),
+                    backgroundColor: Colors.red,
                   ),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              );
-              Navigator.pushReplacementNamed(context, '/login');
+                );
+              } finally {
+                if (mounted) setState(() => _isLoading = false);
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

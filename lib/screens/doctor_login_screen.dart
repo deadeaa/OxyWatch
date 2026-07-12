@@ -1,71 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/app_colors.dart';
-import '../models/user_model.dart';
-import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
-import '../utils/languages.dart';
-import '../widgets/oxywatch_logo.dart';
-import '../screens/role_selection_screen.dart';
+import '../providers/auth_provider.dart';
 import '../screens/register_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class DoctorLoginScreen extends StatefulWidget {
+  final VoidCallback onBack;
+
+  const DoctorLoginScreen({
+    super.key,
+    required this.onBack,
+  });
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<DoctorLoginScreen> createState() => _DoctorLoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  bool _obscurePassword = true;
+  bool _isLoading = false;
+  bool _touched = false;
+  String _emailError = '';
+
+  static const String _domain = '@presuhealthcare.doc.ac.id';
+
+  String _validateEmail(String value) {
+    if (value.trim().isEmpty) {
+      return 'Email wajib diisi';
+    }
+    if (!value.contains(_domain)) {
+      return 'Email harus menggunakan domain $_domain';
+    }
+    return '';
   }
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _handleEmailChange(String value) {
+    setState(() {
+      if (_touched) {
+        _emailError = _validateEmail(value);
+      }
+    });
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    setState(() {
+      _touched = true;
+      _emailError = _validateEmail(email);
+    });
+
+    if (_emailError.isNotEmpty) return;
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password wajib diisi'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password minimal 6 karakter'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      final success = await authProvider.login(email, password);
 
       if (!mounted) return;
 
       if (success) {
-        final user = authProvider.currentUser;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Login successful!'),
+            content: Text('✅ Login berhasil!'),
             backgroundColor: Colors.green,
           ),
         );
-
-        if (user?.role == UserRole.parent) {
-          if (authProvider.isProfileCompleted) {
-            Navigator.pushReplacementNamed(context, '/main');
-          } else {
-            Navigator.pushReplacementNamed(context, '/onboarding');
-          }
-        } else {
-          Navigator.pushReplacementNamed(context, '/doctor');
-        }
+        Navigator.pushReplacementNamed(context, '/doctor');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.error ?? 'Login failed.'),
+            content: Text(authProvider.error ?? 'Login gagal'),
             backgroundColor: Colors.red,
           ),
         );
@@ -86,34 +118,47 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final currentLang = languageProvider.currentLanguage;
-
-    // 🔥 LANGSUNG PAKE currentLang buat semua teks
     final isId = currentLang == 'id';
 
-    // Text translations
-    final welcomeBack = isId ? 'Selamat datang' : 'Welcome';
-    final loginTitle = isId ? 'Masuk ke akun Anda' : 'Sign in to your account';
-    final emailLabel = isId ? 'Email' : 'Email';
-    final emailHint = isId ? 'nama@email.com' : 'name@email.com';
+    // 🔥 SEMUA TEKS PAKE currentLang
+    final doctorLogin = isId ? 'Login Dokter' : 'Doctor Login';
+    final doctorLoginSubtitle = isId ? 'Press Healthcare — OxyWatch Clinic' : 'Press Healthcare — OxyWatch Clinic';
+    final institutionalEmail = isId ? 'Email Institusi' : 'Institutional Email';
+    final institutionalEmailHint = isId
+        ? 'nama.dokter@presuhealthcare.doc.ac.id'
+        : 'doctor.name@presuhealthcare.doc.ac.id';
+    final institutionalEmailNote = isId
+        ? 'Gunakan email institusi @presuhealthcare.doc.ac.id'
+        : 'Use institutional email @presuhealthcare.doc.ac.id';
+    final emailRequired = isId ? 'Email wajib diisi' : 'Email is required';
+    final emailMustUseDomain = isId
+        ? 'Email harus menggunakan domain @presuhealthcare.doc.ac.id'
+        : 'Email must use domain @presuhealthcare.doc.ac.id';
+    final emailValid = isId ? 'Email valid' : 'Email valid';
     final passwordLabel = isId ? 'Password' : 'Password';
     final passwordHint = isId ? 'Masukkan kata sandi' : 'Enter password';
-    final forgotPassword = isId ? 'Lupa kata sandi?' : 'Forgot password?';
-    final loginButton = isId ? 'Masuk' : 'Login';
-    final registerLink = isId ? 'Belum punya akun? Daftar' : 'Don\'t have an account? Register';
-    final emailRequired = isId ? 'Email wajib diisi' : 'Email is required';
-    final invalidEmail = isId ? 'Email tidak valid' : 'Invalid email';
     final passwordRequired = isId ? 'Password wajib diisi' : 'Password is required';
     final passwordMin6 = isId ? 'Password minimal 6 karakter' : 'Password must be at least 6 characters';
-    final forgotPasswordComingSoon = isId ? 'Fitur lupa kata sandi segera hadir' : 'Forgot password feature coming soon';
+    final forgotPasswordText = isId ? 'Lupa kata sandi?' : 'Forgot password?';
+    final forgotPasswordComingSoon = isId
+        ? 'Fitur lupa kata sandi segera hadir'
+        : 'Forgot password feature coming soon';
+    final loginAsDoctor = isId ? 'Masuk sebagai Dokter' : 'Login as Doctor';
+    final contactIT = isId
+        ? 'Hubungi IT Press Healthcare untuk akses akun dokter'
+        : 'Contact IT Press Healthcare for doctor account access';
+    final registerLink = isId
+        ? 'Belum punya akun dokter? Daftar'
+        : 'Don\'t have a doctor account? Register';
 
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
         child: Column(
           children: [
-            // Header area
+            // Header
             Container(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
               child: Stack(
                 children: [
                   // Back button - KIRI (kembali ke role selection)
@@ -121,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     left: 0,
                     top: 0,
                     child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: widget.onBack,
                       child: Container(
                         width: 36,
                         height: 36,
@@ -155,26 +200,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  // Logo and title - CENTER
+                  // Center: Logo dan title
                   Center(
                     child: Column(
                       children: [
-                        const OxyWatchLogo(size: 40, showPulse: false),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16233B),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: const Icon(
+                            Icons.medical_services_outlined,
+                            color: Color(0xFF4FC3F7),
+                            size: 22,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         Text(
-                          welcomeBack,
+                          doctorLogin,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'OxyWatch',
+                          doctorLoginSubtitle,
                           style: const TextStyle(
                             color: Color(0xFFA9B7CC),
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -198,42 +255,73 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          loginTitle,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
+                        // Institutional note
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4FC3F7).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF4FC3F7).withOpacity(0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                color: Color(0xFF4FC3F7),
+                                size: 14,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  institutionalEmailNote,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF1B3A5C),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         // Email
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              emailLabel,
+                              institutionalEmail,
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
+                                color: Color(0xFF64748B),
                               ),
                             ),
                             const SizedBox(height: 6),
                             TextFormField(
                               controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
+                              onChanged: _handleEmailChange,
+                              onTap: () {
+                                if (!_touched) {
+                                  setState(() => _touched = false);
+                                }
+                              },
+                              onFieldSubmitted: (_) => _handleLogin(),
                               style: const TextStyle(
                                 fontSize: 13,
-                                color: AppColors.primary,
+                                color: Color(0xFF1B3A5C),
                               ),
                               decoration: InputDecoration(
-                                hintText: emailHint,
+                                hintText: institutionalEmailHint,
                                 hintStyle: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF94A3B8),
                                 ),
                                 filled: true,
-                                fillColor: const Color(0xFFF8FAFF),
+                                fillColor: _emailError.isNotEmpty
+                                    ? const Color(0xFFFFF5F5)
+                                    : const Color(0xFFF8FAFF),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide: BorderSide.none,
@@ -245,7 +333,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide: const BorderSide(
-                                    color: AppColors.primaryLight,
+                                    color: Color(0xFF4FC3F7),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: Colors.red,
                                     width: 1.5,
                                   ),
                                 ),
@@ -258,12 +353,56 @@ class _LoginScreenState extends State<LoginScreen> {
                                 if (value == null || value.trim().isEmpty) {
                                   return emailRequired;
                                 }
-                                if (!value.contains('@')) {
-                                  return invalidEmail;
+                                if (!value.contains(_domain)) {
+                                  return emailMustUseDomain;
                                 }
                                 return null;
                               },
                             ),
+                            // Email validation feedback
+                            if (_emailError.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Colors.red,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      _emailError,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else if (_touched &&
+                                _emailController.text.isNotEmpty &&
+                                _emailController.text.contains(_domain)) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Color(0xFF22C55E),
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    emailValid,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF22C55E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -276,16 +415,17 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
+                                color: Color(0xFF64748B),
                               ),
                             ),
                             const SizedBox(height: 6),
                             TextFormField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
+                              onFieldSubmitted: (_) => _handleLogin(),
                               style: const TextStyle(
                                 fontSize: 13,
-                                color: AppColors.primary,
+                                color: Color(0xFF1B3A5C),
                               ),
                               decoration: InputDecoration(
                                 hintText: passwordHint,
@@ -306,7 +446,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide: const BorderSide(
-                                    color: AppColors.primaryLight,
+                                    color: Color(0xFF4FC3F7),
                                     width: 1.5,
                                   ),
                                 ),
@@ -352,10 +492,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   );
                                 },
                                 child: Text(
-                                  forgotPassword,
+                                  forgotPasswordText,
                                   style: const TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.primaryLight,
+                                    color: Color(0xFF4FC3F7),
                                   ),
                                 ),
                               ),
@@ -363,14 +503,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                         const SizedBox(height: 20),
-                        // Login button
+                        // CTA
                         SizedBox(
                           width: double.infinity,
                           height: 44,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
+                            onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
+                              backgroundColor: const Color(0xFF1B3A5C),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -385,7 +525,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             )
                                 : Text(
-                              loginButton,
+                              loginAsDoctor,
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -394,15 +534,25 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        // Register link
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            contactIT,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ),
+                        // 🔥 LINK KE REGISTER DOCTOR
+                        const SizedBox(height: 4),
                         Center(
                           child: TextButton(
                             onPressed: () {
-                              Navigator.pushReplacement(
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const RegisterScreen(role: 'parent'),
+                                  builder: (_) => const RegisterScreen(role: 'doctor'),
                                 ),
                               );
                             },
@@ -410,7 +560,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               registerLink,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: AppColors.primaryLight,
+                                color: Color(0xFF4FC3F7),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),

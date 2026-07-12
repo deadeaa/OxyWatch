@@ -1,7 +1,7 @@
-// providers/auth_provider.dart
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import 'language_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -11,6 +11,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isProfileCompleted = false;
   String? _error;
   UserModel? _currentUser;
+  String _language = 'id';
 
   // Patient data
   String _patientId = '';
@@ -44,6 +45,7 @@ class AuthProvider extends ChangeNotifier {
   bool get watchConnected => _watchConnected;
   String get watchBattery => _watchBattery;
   String get deviceName => _deviceName;
+  String get language => _language;
 
   // ==========================
   // AUTH METHODS
@@ -70,7 +72,6 @@ class AuthProvider extends ChangeNotifier {
       if (result.success) {
         _currentUser = result.user;
         _isLoggedIn = true;
-        // Doctor langsung selesai, parent perlu onboarding
         _isProfileCompleted = role == UserRole.doctor;
         _isLoading = false;
         notifyListeners();
@@ -103,7 +104,9 @@ class AuthProvider extends ChangeNotifier {
       if (result.success) {
         _currentUser = result.user;
         _isLoggedIn = true;
-        _isProfileCompleted = true;
+
+        await _loadProfileData();
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -121,6 +124,63 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // ==========================
+  // LOAD PROFILE DATA
+  // ==========================
+
+  Future<void> _loadProfileData() async {
+    if (_currentUser == null) return;
+
+    try {
+      final data = await _authService.getUserDataMap(_currentUser!.uid);
+      if (data != null) {
+        _patientId = data['patientId'] ?? '';
+        _nama = data['nama'] ?? '';
+        _usia = data['usia'] ?? '';
+        _bb = data['bb'] ?? '';
+        _tb = data['tb'] ?? '';
+        _goldar = data['goldar'] ?? '';
+        _riwayat = data['riwayat'] is List ? List<String>.from(data['riwayat']) : [];
+        _alertSpO2 = data['alertSpO2'] ?? true;
+        _alertHR = data['alertHR'] ?? true;
+        _watchConnected = data['watchConnected'] ?? false;
+        _watchBattery = data['watchBattery'] ?? '0%';
+        _deviceName = data['deviceName'] ?? '';
+        _isProfileCompleted = data['profileCompleted'] ?? false;
+        _language = data['language'] ?? 'id';
+      }
+    } catch (e) {
+      debugPrint("Error loading profile data: $e");
+    }
+  }
+
+  // ==========================
+  // UPDATE LANGUAGE
+  // ==========================
+
+  Future<void> updateUserLanguage(String langCode) async {
+    _language = langCode;
+    if (_currentUser != null) {
+      await _authService.updateUserData(_currentUser!.uid, {
+        'language': langCode,
+      });
+    }
+    notifyListeners();
+  }
+
+  // ==========================
+  // LOAD PROFILE DATA (PUBLIC)
+  // ==========================
+
+  Future<void> loadUserData() async {
+    await _loadProfileData();
+    notifyListeners();
+  }
+
+  // ==========================
+  // LOGOUT
+  // ==========================
+
   Future<void> logout() async {
     await _authService.logout();
     _isLoggedIn = false;
@@ -134,6 +194,7 @@ class AuthProvider extends ChangeNotifier {
     _goldar = '';
     _riwayat = [];
     _watchConnected = false;
+    _language = 'id';
     notifyListeners();
   }
 
@@ -165,15 +226,12 @@ class AuthProvider extends ChangeNotifier {
     _alertSpO2 = alertSpO2;
     _alertHR = alertHR;
 
-    // Kalau patientId dikirim dari pemanggil, pakai itu.
-    // Kalau tidak, auto-generate seperti semula.
     _patientId = patientId.isNotEmpty
         ? patientId
         : 'PED-${DateTime.now().millisecondsSinceEpoch.toString().substring(6, 10)}';
 
     _isProfileCompleted = true;
 
-    // 🔥 SAVE KE FIRESTORE
     _saveToFirestore();
 
     notifyListeners();
@@ -194,6 +252,7 @@ class AuthProvider extends ChangeNotifier {
         'alertSpO2': _alertSpO2,
         'alertHR': _alertHR,
         'profileCompleted': true,
+        'language': _language,
       });
     } catch (e) {
       debugPrint("Error saving profile to Firestore: $e");
@@ -211,10 +270,16 @@ class AuthProvider extends ChangeNotifier {
     if (data.containsKey('bb')) _bb = data['bb'] ?? '';
     if (data.containsKey('tb')) _tb = data['tb'] ?? '';
     if (data.containsKey('goldar')) _goldar = data['goldar'] ?? '';
-    if (data.containsKey('riwayat')) _riwayat = data['riwayat'] is List ? data['riwayat'] : [];
+    if (data.containsKey('riwayat')) _riwayat = data['riwayat'] is List ? List<String>.from(data['riwayat']) : [];
     if (data.containsKey('alertSpO2')) _alertSpO2 = data['alertSpO2'];
     if (data.containsKey('alertHR')) _alertHR = data['alertHR'];
     if (data.containsKey('deviceName')) _deviceName = data['deviceName'] ?? '';
+    if (data.containsKey('watchConnected')) _watchConnected = data['watchConnected'];
+    if (data.containsKey('watchBattery')) _watchBattery = data['watchBattery'] ?? '0%';
+    if (data.containsKey('profileCompleted')) _isProfileCompleted = data['profileCompleted'];
+    if (data.containsKey('language')) {
+      _language = data['language'];
+    }
     notifyListeners();
   }
 
@@ -233,19 +298,32 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ==========================
-  // LOAD FROM FIRESTORE
+  // DELETE PROFILE
   // ==========================
 
-  Future<void> loadUserData() async {
+  Future<void> deleteProfile() async {
     if (_currentUser == null) return;
 
     try {
-      final userData = await _authService.getUserData(_currentUser!.uid);
-      if (userData != null) {
-        _patientId = userData.userCode;
-      }
+      await _authService.deleteUserData(_currentUser!.uid);
+      await _authService.deleteAccount();
+
+      _isLoggedIn = false;
+      _isProfileCompleted = false;
+      _currentUser = null;
+      _patientId = '';
+      _nama = '';
+      _usia = '';
+      _bb = '';
+      _tb = '';
+      _goldar = '';
+      _riwayat = [];
+      _watchConnected = false;
+      _language = 'id';
+      notifyListeners();
     } catch (e) {
-      debugPrint("Error loading user data: $e");
+      debugPrint("Error deleting profile: $e");
+      rethrow;
     }
   }
 }
