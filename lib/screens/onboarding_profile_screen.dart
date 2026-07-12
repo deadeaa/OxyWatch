@@ -1,7 +1,10 @@
 // screens/onboarding_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;  // 🔥 ALIAS
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../providers/auth_provider.dart';  // 🔥 INI AUTH PROVIDER KITA
+import '../utils/languages.dart';
 
 class OnboardingProfileScreen extends StatefulWidget {
   const OnboardingProfileScreen({super.key});
@@ -12,6 +15,7 @@ class OnboardingProfileScreen extends StatefulWidget {
 
 class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   int _currentStep = 0;
+  bool _isLoading = false;
 
   // Data Diri
   final TextEditingController _namaController = TextEditingController();
@@ -31,6 +35,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   // Connect Smartwatch
   bool _isConnecting = false;
   String _selectedDevice = '';
+
+  // Firebase - pake alias
+  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Daftar Golongan Darah
   final List<String> _goldarOptions = [
@@ -82,11 +90,18 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     return double.tryParse(value) != null && double.parse(value) > 0;
   }
 
-  void _saveProfile({bool connectWatch = false, String deviceName = ''}) {
+  // ========== SAVE TO FIREBASE ==========
+  Future<void> _saveProfileToFirebase({
+    bool connectWatch = false,
+    String deviceName = '',
+  }) async {
+    final lang = AppLocalizations.of(context)!;
+
+    // Validasi
     if (!_isValidName(_namaController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nama harus minimal 2 huruf dan tidak boleh kosong'),
+        SnackBar(
+          content: Text(lang.namaMinimal2),
           backgroundColor: Colors.orange,
         ),
       );
@@ -95,8 +110,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
     if (!_isNumeric(_usiaController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Usia harus berupa angka'),
+        SnackBar(
+          content: Text(lang.usiaHarusAngka),
           backgroundColor: Colors.orange,
         ),
       );
@@ -105,8 +120,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
     if (!_isNumeric(_bbController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('BB harus berupa angka'),
+        SnackBar(
+          content: Text(lang.bbHarusAngka),
           backgroundColor: Colors.orange,
         ),
       );
@@ -115,57 +130,170 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
     if (!_isNumeric(_tbController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('TB harus berupa angka'),
+        SnackBar(
+          content: Text(lang.tbHarusAngka),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final authProvider = context.read<AuthProvider>();
+    setState(() => _isLoading = true);
 
-    authProvider.setProfile(
-      nama: _namaController.text.trim(),
-      usia: _usiaController.text.trim(),
-      bb: _bbController.text.trim(),
-      tb: _tbController.text.trim(),
-      goldar: _selectedGoldar,
-      riwayat: _riwayatKondisi,
-      alertSpO2: _alertSpO2,
-      alertHR: _alertHR,
-      patientId: '',
-    );
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
 
-    if (connectWatch && deviceName.isNotEmpty) {
-      authProvider.connectWatch();
-      authProvider.updateProfile({'deviceName': deviceName});
+      // Generate patient ID
+      final String patientId = 'PED-${DateTime.now().millisecondsSinceEpoch.toString().substring(7, 12)}';
+
+      // Data profil
+      final profileData = {
+        'uid': user.uid,
+        'nama': _namaController.text.trim(),
+        'usia': _usiaController.text.trim(),
+        'bb': _bbController.text.trim(),
+        'tb': _tbController.text.trim(),
+        'goldar': _selectedGoldar,
+        'riwayat': _riwayatKondisi,
+        'alertSpO2': _alertSpO2,
+        'alertHR': _alertHR,
+        'patientId': patientId,
+        'deviceName': connectWatch ? deviceName : '',
+        'watchConnected': connectWatch,
+        'watchBattery': '100%',
+        'profileCompleted': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Simpan ke Firestore
+      await _firestore.collection('users').doc(user.uid).set(
+        profileData,
+        SetOptions(merge: true),
+      );
+
+      // Update AuthProvider
+      final authProvider = context.read<AuthProvider>();
+      authProvider.setProfile(
+        nama: _namaController.text.trim(),
+        usia: _usiaController.text.trim(),
+        bb: _bbController.text.trim(),
+        tb: _tbController.text.trim(),
+        goldar: _selectedGoldar,
+        riwayat: _riwayatKondisi,
+        alertSpO2: _alertSpO2,
+        alertHR: _alertHR,
+        patientId: patientId,
+      );
+
+      if (connectWatch && deviceName.isNotEmpty) {
+        authProvider.connectWatch();
+        authProvider.updateProfile({'deviceName': deviceName});
+      }
+
+      authProvider.setProfileCompleted(true);
+
+      // Navigasi ke dashboard
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/main');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${lang.profilBerhasil}'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Gagal menyimpan profil: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-
-    authProvider.setProfileCompleted(true);
-
-    // 🔥 LANGSUNG KE DASHBOARD - TANPA KONDISI
-    Navigator.pushReplacementNamed(context, '/main');
   }
 
-  void _skip() {
-    final authProvider = context.read<AuthProvider>();
-    authProvider.setProfile(
-      nama: '',
-      usia: '',
-      bb: '',
-      tb: '',
-      goldar: '',
-      riwayat: [],
-      alertSpO2: true,
-      alertHR: true,
-      patientId: 'PED-0000',
-    );
-    authProvider.setProfileCompleted(true);
-    Navigator.pushReplacementNamed(context, '/main');
+  // ========== SKIP ==========
+  Future<void> _skip() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      final authProvider = context.read<AuthProvider>();
+
+      // Data kosong untuk skip
+      final profileData = {
+        'uid': user.uid,
+        'nama': '',
+        'usia': '',
+        'bb': '',
+        'tb': '',
+        'goldar': '',
+        'riwayat': [],
+        'alertSpO2': true,
+        'alertHR': true,
+        'patientId': 'PED-0000',
+        'deviceName': '',
+        'watchConnected': false,
+        'watchBattery': '0%',
+        'profileCompleted': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('users').doc(user.uid).set(
+        profileData,
+        SetOptions(merge: true),
+      );
+
+      authProvider.setProfile(
+        nama: '',
+        usia: '',
+        bb: '',
+        tb: '',
+        goldar: '',
+        riwayat: [],
+        alertSpO2: true,
+        alertHR: true,
+        patientId: 'PED-0000',
+      );
+      authProvider.setProfileCompleted(true);
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/main');
+      }
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Gagal skip: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  // 🔥 SHOW BLUETOOTH DEVICE PICKER - VERSI PALING SIMPEL
+  // ========== BLUETOOTH PICKER ==========
   void _showBluetoothPicker() {
     showModalBottomSheet(
       context: context,
@@ -245,11 +373,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                     ),
                     trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                     onTap: () {
-                      // 🔥 TUTUP BOTTOM SHEET
                       Navigator.pop(context);
-
-                      // 🔥 LANGSUNG SAVE + NAVIGASI - TANPA SETSTATE, TANPA DELAY
-                      _saveProfile(
+                      _saveProfileToFirebase(
                         connectWatch: true,
                         deviceName: device['name']!,
                       );
@@ -327,42 +452,61 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Lengkapi Profil'),
+        title: Text(lang.lengkapiProfil),
         backgroundColor: const Color(0xFF1B3A5C),
         actions: [
           TextButton(
-            onPressed: _skip,
-            child: const Text(
-              'Skip',
-              style: TextStyle(color: Colors.white),
+            onPressed: _isLoading ? null : _skip,
+            child: Text(
+              lang.skip,
+              style: const TextStyle(color: Colors.white),
             ),
           ),
         ],
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF4FC3F7)),
+            SizedBox(height: 16),
+            Text(
+              'Menyimpan profil...',
+              style: TextStyle(
+                color: Color(0xFF1B3A5C),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      )
+          : Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.white,
             child: Row(
               children: [
-                _buildStepIndicator(0, 'Data Diri'),
+                _buildStepIndicator(0, lang.dataDiriAnak),
                 _buildStepLine(),
-                _buildStepIndicator(1, 'Riwayat'),
+                _buildStepIndicator(1, lang.riwayatKondisi),
                 _buildStepLine(),
-                _buildStepIndicator(2, 'Alert'),
+                _buildStepIndicator(2, lang.pengaturanAlert),
                 _buildStepLine(),
-                _buildStepIndicator(3, 'Connect'),
+                _buildStepIndicator(3, lang.connectSmartwatch),
               ],
             ),
           ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: _buildStepContent(),
+              child: _buildStepContent(lang),
             ),
           ),
         ],
@@ -402,6 +546,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
               color: isActive ? const Color(0xFF1B3A5C) : Colors.grey.shade400,
               fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -416,38 +561,38 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     );
   }
 
-  Widget _buildStepContent() {
+  Widget _buildStepContent(AppLocalizations lang) {
     switch (_currentStep) {
       case 0:
-        return _buildDataDiriStep();
+        return _buildDataDiriStep(lang);
       case 1:
-        return _buildRiwayatStep();
+        return _buildRiwayatStep(lang);
       case 2:
-        return _buildAlertStep();
+        return _buildAlertStep(lang);
       case 3:
-        return _buildConnectStep();
+        return _buildConnectStep(lang);
       default:
         return const SizedBox();
     }
   }
 
   // ========== STEP 1: DATA DIRI ==========
-  Widget _buildDataDiriStep() {
+  Widget _buildDataDiriStep(AppLocalizations lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Data Diri Anak',
-          style: TextStyle(
+        Text(
+          lang.dataDiriAnak,
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Color(0xFF1B3A5C),
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Isi data diri anak untuk memulai monitoring',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+        Text(
+          lang.isiDataDiri,
+          style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 16),
         Expanded(
@@ -457,10 +602,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTextField('Nama Lengkap', _namaController),
+                    _buildTextField(lang.namaLengkap, _namaController),
                     const SizedBox(height: 4),
                     Text(
-                      'Minimal 2 huruf',
+                      lang.minimal2Huruf,
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.grey.shade400,
@@ -475,10 +620,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTextField('Usia (tahun)', _usiaController, keyboardType: TextInputType.number),
+                          _buildTextField('${lang.usia} (${lang.tahun})', _usiaController, keyboardType: TextInputType.number),
                           const SizedBox(height: 4),
                           Text(
-                            'Hanya angka',
+                            lang.hanyaAngka,
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey.shade400,
@@ -492,10 +637,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTextField('BB (kg)', _bbController, keyboardType: TextInputType.number),
+                          _buildTextField('${lang.bb} (kg)', _bbController, keyboardType: TextInputType.number),
                           const SizedBox(height: 4),
                           Text(
-                            'Hanya angka',
+                            lang.hanyaAngka,
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey.shade400,
@@ -513,10 +658,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTextField('TB (cm)', _tbController, keyboardType: TextInputType.number),
+                          _buildTextField('${lang.tb} (cm)', _tbController, keyboardType: TextInputType.number),
                           const SizedBox(height: 4),
                           Text(
-                            'Hanya angka',
+                            lang.hanyaAngka,
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey.shade400,
@@ -530,9 +675,9 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Gol. Darah',
-                            style: TextStyle(
+                          Text(
+                            lang.goldar,
+                            style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -582,8 +727,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
             onPressed: () {
               if (!_isValidName(_namaController.text.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Nama harus minimal 2 huruf'),
+                  SnackBar(
+                    content: Text(lang.namaMinimal2),
                     backgroundColor: Colors.orange,
                   ),
                 );
@@ -591,8 +736,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
               }
               if (!_isNumeric(_usiaController.text.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Usia harus berupa angka'),
+                  SnackBar(
+                    content: Text(lang.usiaHarusAngka),
                     backgroundColor: Colors.orange,
                   ),
                 );
@@ -600,8 +745,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
               }
               if (!_isNumeric(_bbController.text.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('BB harus berupa angka'),
+                  SnackBar(
+                    content: Text(lang.bbHarusAngka),
                     backgroundColor: Colors.orange,
                   ),
                 );
@@ -609,8 +754,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
               }
               if (!_isNumeric(_tbController.text.trim())) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('TB harus berupa angka'),
+                  SnackBar(
+                    content: Text(lang.tbHarusAngka),
                     backgroundColor: Colors.orange,
                   ),
                 );
@@ -623,7 +768,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Next →', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: Text(
+              lang.next,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
         ),
       ],
@@ -631,22 +779,22 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   }
 
   // ========== STEP 2: RIWAYAT KONDISI ==========
-  Widget _buildRiwayatStep() {
+  Widget _buildRiwayatStep(AppLocalizations lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Riwayat Kondisi',
-          style: TextStyle(
+        Text(
+          lang.riwayatKondisi,
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Color(0xFF1B3A5C),
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Tambahkan riwayat kondisi kesehatan anak',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+        Text(
+          lang.tambahkanRiwayat,
+          style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 12),
         Row(
@@ -656,7 +804,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                 controller: _kondisiController,
                 style: const TextStyle(color: Color(0xFF1B3A5C)),
                 decoration: InputDecoration(
-                  hintText: 'Tambah kondisi...',
+                  hintText: lang.tambahKondisi,
                   hintStyle: TextStyle(color: Colors.grey.shade400),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -716,12 +864,12 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
           ),
         ),
         if (_riwayatKondisi.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
             child: Center(
               child: Text(
-                'Belum ada kondisi tambahan',
-                style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                lang.belumAdaKondisi,
+                style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
               ),
             ),
           ),
@@ -736,7 +884,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: Text('← Back', style: TextStyle(color: Colors.grey.shade700)),
+                child: Text(
+                  lang.back,
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -748,7 +899,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Next →', style: TextStyle(color: Colors.white)),
+                child: Text(
+                  lang.next,
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
             ),
           ],
@@ -758,22 +912,22 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   }
 
   // ========== STEP 3: PENGATURAN ALERT ==========
-  Widget _buildAlertStep() {
+  Widget _buildAlertStep(AppLocalizations lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Pengaturan Alert',
-          style: TextStyle(
+        Text(
+          lang.pengaturanAlert,
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Color(0xFF1B3A5C),
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Atur notifikasi peringatan kesehatan',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+        Text(
+          lang.aturNotifikasi,
+          style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 16),
         Expanded(
@@ -782,14 +936,14 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
               children: [
                 _buildAlertToggle(
                   'Alert SpO₂',
-                  'Notif jika SpO₂ < 94%',
+                  '${lang.notifJika} SpO₂ < 94%',
                   _alertSpO2,
                       (value) => setState(() => _alertSpO2 = value),
                 ),
                 const Divider(color: Color(0xFFF1F5F9), height: 24),
                 _buildAlertToggle(
-                  'Alert Detak Jantung',
-                  'Notif jika HR > 140 bpm',
+                  'Alert ${lang.heartRate}',
+                  '${lang.notifJika} HR > 140 bpm',
                   _alertHR,
                       (value) => setState(() => _alertHR = value),
                 ),
@@ -808,7 +962,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: Text('← Back', style: TextStyle(color: Colors.grey.shade700)),
+                child: Text(
+                  lang.back,
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -820,7 +977,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Next →', style: TextStyle(color: Colors.white)),
+                child: Text(
+                  lang.next,
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
             ),
           ],
@@ -830,22 +990,22 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   }
 
   // ========== STEP 4: CONNECT SMARTWATCH ==========
-  Widget _buildConnectStep() {
+  Widget _buildConnectStep(AppLocalizations lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Connect Smartwatch',
-          style: TextStyle(
+        Text(
+          lang.connectSmartwatch,
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Color(0xFF1B3A5C),
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Hubungkan smartwatch untuk monitoring real-time',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+        Text(
+          lang.hubungkanSmartwatch,
+          style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 12),
         Expanded(
@@ -867,17 +1027,17 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Cari Perangkat Bluetooth',
-                              style: TextStyle(
+                            Text(
+                              lang.cariPerangkat,
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
                             ),
                             Text(
                               _selectedDevice.isNotEmpty
-                                  ? 'Terhubung ke: $_selectedDevice'
-                                  : 'Klik tombol di bawah untuk mencari perangkat',
+                                  ? '${lang.terhubung} ke: $_selectedDevice'
+                                  : lang.pastikanBluetooth,
                               style: TextStyle(
                                 color: _selectedDevice.isNotEmpty
                                     ? Colors.green
@@ -907,7 +1067,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Pastikan Bluetooth aktif dan smartwatch dalam mode pairing',
+                          lang.pastikanBluetooth,
                           style: TextStyle(
                             color: Colors.orange.shade600,
                             fontSize: 11,
@@ -931,7 +1091,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Kamu bisa skip dan menghubungkan nanti di halaman Profil',
+                          lang.skipConnect,
                           style: TextStyle(
                             color: Colors.green.shade600,
                             fontSize: 11,
@@ -952,27 +1112,31 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: Text('← Back', style: TextStyle(color: Colors.grey.shade700)),
+                        child: Text(
+                          lang.back,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          _saveProfile(connectWatch: false);
-                        },
+                        onPressed: _isLoading ? null : () => _saveProfileToFirebase(connectWatch: false),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey.shade400,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text('Skip Connect', style: TextStyle(color: Colors.white)),
+                        child: Text(
+                          lang.skipConnectBtn,
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _isConnecting
+                        onPressed: _isLoading || _isConnecting
                             ? null
                             : () {
                           _showBluetoothPicker();
@@ -998,7 +1162,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                               const Icon(Icons.bluetooth, color: Colors.white, size: 18),
                             const SizedBox(width: 8),
                             Text(
-                              _isConnecting ? 'Mencari...' : 'Connect',
+                              _isConnecting ? lang.mencari : lang.connect,
                               style: const TextStyle(color: Colors.white),
                             ),
                           ],

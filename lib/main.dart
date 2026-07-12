@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'providers/emergency_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/notifikasi_provider.dart';
@@ -17,9 +19,17 @@ import 'screens/emergency_monitor_screen.dart';
 import 'screens/onboarding_profile_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/doctor_dashboard_screen.dart';
+import 'screens/register_screen.dart';
 import 'utils/languages.dart';
+import 'screens/role_selection_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
     MultiProvider(
       providers: [
@@ -111,6 +121,12 @@ class MyApp extends StatelessWidget {
             '/emergency': (context) => const EmergencyMonitorScreen(),
             '/onboarding': (context) => const OnboardingProfileScreen(),
             '/login': (context) => const LoginScreen(),
+            // 🔥 FIX: tambahkan role parameter
+            '/register': (context) => const RegisterScreen(role: 'parent'),
+            '/parent': (context) => const DashboardScreen(),
+            '/doctor': (context) => const DoctorDashboard(),
+            // main.dart - tambahkan route
+            '/role-selection': (context) => const RoleSelectionScreen(),
           },
         );
       },

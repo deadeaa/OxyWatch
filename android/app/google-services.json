@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "553976003553",
-    "project_id": "oxywatch-6a550",
-    "storage_bucket": "oxywatch-6a550.firebasestorage.app"
+    "project_number": "329126827394",
+    "project_id": "oxywatch-d9ff0",
+    "storage_bucket": "oxywatch-d9ff0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:553976003553:android:77bf9838915ccb5ff7b0a0",
+        "mobilesdk_app_id": "1:329126827394:android:8193443998586208cdab9b",
         "android_client_info": {
           "package_name": "com.example.oxywatch"
         }
@@ -15,7 +15,26 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAjvgrAmlxIIJqrkT8K5awDey4J6FAyM3Y"
+          "current_key": "AIzaSyBFburCMXpUlwwkO__6WTIYP7NEs1RF4ds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:329126827394:android:2c9ca24c6f490764cdab9b",
+        "android_client_info": {
+          "package_name": "com.oxywatch.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFburCMXpUlwwkO__6WTIYP7NEs1RF4ds"
         }
       ],
       "services": {

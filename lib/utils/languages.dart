@@ -108,6 +108,7 @@ class AppLocalizations {
   // ========== STATUS ==========
   String get warning => locale.languageCode == 'id' ? 'Warning' : 'Warning';
   String get kritis => locale.languageCode == 'id' ? 'KRITIS' : 'CRITICAL';
+  String get statusLabel => locale.languageCode == 'id' ? 'Status' : 'Status';
 
   // ========== CHAT ==========
   String get chatDenganDokter => locale.languageCode == 'id' ? 'Chat dengan Dokter' : 'Chat with Doctor';
