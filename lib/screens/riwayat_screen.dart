@@ -1,5 +1,10 @@
 // screens/riwayat_screen.dart
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
+import '../utils/languages.dart';
+import '../providers/auth_provider.dart';
+import '../models/riwayat_model.dart';
 
 class RiwayatScreen extends StatefulWidget {
   const RiwayatScreen({super.key});
@@ -10,105 +15,106 @@ class RiwayatScreen extends StatefulWidget {
 
 class _RiwayatScreenState extends State<RiwayatScreen> {
   String _selectedFilter = 'Hari ini';
-  final List<Map<String, dynamic>> _logs = [];
-  final List<Map<String, dynamic>> _weeklyLogs = [];
-  final List<Map<String, dynamic>> _monthlyLogs = [];
-
   final List<String> _filters = ['Hari ini', 'Minggu ini', 'Bulan ini'];
+  List<RiwayatModel> _data = [];
 
   @override
   void initState() {
     super.initState();
-    _loadLogs();
-    _loadWeeklyLogs();
-    _loadMonthlyLogs();
+    _loadData();
   }
 
-  void _loadLogs() {
-    _logs.addAll([
-      {'time': '23:42', 'spo2': '98', 'hr': '103', 'status': 'Normal'},
-      {'time': '21:15', 'spo2': '97', 'hr': '108', 'status': 'Normal'},
-      {'time': '18:30', 'spo2': '94', 'hr': '122', 'status': 'Warning'},
-      {'time': '15:10', 'spo2': '99', 'hr': '100', 'status': 'Normal'},
-      {'time': '12:45', 'spo2': '96', 'hr': '115', 'status': 'Normal'},
-      {'time': '10:00', 'spo2': '89', 'hr': '162', 'status': 'Kritis'},
-      {'time': '08:20', 'spo2': '97', 'hr': '106', 'status': 'Normal'},
-      {'time': '06:00', 'spo2': '98', 'hr': '99', 'status': 'Normal'},
-    ]);
+  void _loadData() {
+    setState(() {
+      _data = RiwayatModel.getDataForFilter(_selectedFilter);
+    });
   }
 
-  void _loadWeeklyLogs() {
-    _weeklyLogs.addAll([
-      {'day': 'Sen', 'spo2': '97.5', 'hr': '110', 'status': 'Normal'},
-      {'day': 'Sel', 'spo2': '96.2', 'hr': '115', 'status': 'Normal'},
-      {'day': 'Rab', 'spo2': '94.8', 'hr': '122', 'status': 'Warning'},
-      {'day': 'Kam', 'spo2': '97.0', 'hr': '108', 'status': 'Normal'},
-      {'day': 'Jum', 'spo2': '95.5', 'hr': '118', 'status': 'Normal'},
-      {'day': 'Sab', 'spo2': '93.0', 'hr': '130', 'status': 'Warning'},
-      {'day': 'Min', 'spo2': '96.5', 'hr': '112', 'status': 'Normal'},
-    ]);
+  Map<String, dynamic> _calculateStats() {
+    if (_data.isEmpty) {
+      return {'avgSpo2': 0.0, 'avgHr': 0.0, 'totalAlert': 0};
+    }
+
+    final spo2Values = _data.map((d) => d.spo2).toList();
+    final hrValues = _data.map((d) => d.hr).toList();
+    final alertCount = _data.where((d) => d.status == 'warning' || d.status == 'critical').length;
+
+    return {
+      'avgSpo2': spo2Values.reduce((a, b) => a + b) / spo2Values.length,
+      'avgHr': hrValues.reduce((a, b) => a + b) / hrValues.length,
+      'totalAlert': alertCount,
+    };
   }
 
-  void _loadMonthlyLogs() {
-    _monthlyLogs.addAll([
-      {'week': 'Minggu 1', 'spo2': '96.8', 'hr': '112', 'status': 'Normal'},
-      {'week': 'Minggu 2', 'spo2': '95.2', 'hr': '120', 'status': 'Warning'},
-      {'week': 'Minggu 3', 'spo2': '97.1', 'hr': '108', 'status': 'Normal'},
-      {'week': 'Minggu 4', 'spo2': '94.5', 'hr': '125', 'status': 'Warning'},
-    ]);
+  int _getLabelInterval() {
+    switch (_selectedFilter) {
+      case 'Hari ini':
+        return 2;
+      case 'Minggu ini':
+        return 1;
+      case 'Bulan ini':
+        return 1;
+      default:
+        return 1;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final isProfileEmpty = auth.nama.isEmpty && auth.usia.isEmpty;
+    final lang = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text(
-          'Riwayat Monitoring',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: Text(lang.riwayatMonitoring),
         backgroundColor: const Color(0xFF1B3A5C),
         elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.file_download),
             onPressed: () {
-              _exportPDF(context);
+              if (!isProfileEmpty) {
+                _showExportDialog(context, lang);
+              }
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: isProfileEmpty
+          ? _buildEmptyState(lang)
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ========== FILTER CHIP ==========
+            // Filter
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _filters.map((filter) {
                 final isSelected = _selectedFilter == filter;
+                String displayName = filter;
+                if (filter == 'Hari ini') displayName = lang.hariIni;
+                else if (filter == 'Minggu ini') displayName = lang.mingguIni;
+                else if (filter == 'Bulan ini') displayName = lang.bulanIni;
+
                 return GestureDetector(
                   onTap: () {
                     setState(() {
                       _selectedFilter = filter;
+                      _loadData();
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF1B3A5C) : Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: isSelected
-                          ? null
-                          : Border.all(color: const Color(0xFFE2E8F0)),
+                      border: isSelected ? null : Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Text(
-                      filter,
+                      displayName,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -120,73 +126,66 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-
-            // ========== STAT CARD ==========
-            if (_selectedFilter == 'Hari ini')
-              _buildDailyStats()
-            else if (_selectedFilter == 'Minggu ini')
-              _buildWeeklyStats()
-            else
-              _buildMonthlyStats(),
-
+            // Stats
+            _buildStats(lang),
             const SizedBox(height: 16),
-
-            // ========== GRAFIK ==========
-            if (_selectedFilter == 'Hari ini')
-              _buildDailyChart()
-            else if (_selectedFilter == 'Minggu ini')
-              _buildWeeklyChart()
-            else
-              _buildMonthlyChart(),
-
+            // Chart
+            _buildChart(lang),
             const SizedBox(height: 16),
-
-            // ========== LOG ==========
-            if (_selectedFilter == 'Hari ini')
-              _buildDailyLog()
-            else if (_selectedFilter == 'Minggu ini')
-              _buildWeeklyLog()
-            else
-              _buildMonthlyLog(),
+            // Legend
+            _buildLegend(lang),
+            const SizedBox(height: 16),
+            // Log Table
+            _buildLogTable(lang),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildEmptyState(AppLocalizations lang) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.history, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            lang.belumAdaRiwayat,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            lang.isiProfilDulu,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ========== STATS ==========
-  Widget _buildDailyStats() {
+  Widget _buildStats(AppLocalizations lang) {
+    final stats = _calculateStats();
     return Row(
       children: [
-        _buildStatCard('Rata-rata SpO₂', '97.2%', const Color(0xFF4FC3F7)),
+        _buildStatCard(
+          lang.rataRataSpo2,
+          '${stats['avgSpo2'].toStringAsFixed(1)}%',
+          const Color(0xFF4FC3F7),
+        ),
         const SizedBox(width: 8),
-        _buildStatCard('Rata-rata HR', '108 bpm', const Color(0xFF22C55E)),
+        _buildStatCard(
+          lang.rataRataHR,
+          '${stats['avgHr'].toStringAsFixed(0)} bpm',
+          const Color(0xFF22C55E),
+        ),
         const SizedBox(width: 8),
-        _buildStatCard('Total Alert', '2', const Color(0xFFEF4444)),
-      ],
-    );
-  }
-
-  Widget _buildWeeklyStats() {
-    return Row(
-      children: [
-        _buildStatCard('Rata-rata SpO₂', '95.8%', const Color(0xFF4FC3F7)),
-        const SizedBox(width: 8),
-        _buildStatCard('Rata-rata HR', '116 bpm', const Color(0xFF22C55E)),
-        const SizedBox(width: 8),
-        _buildStatCard('Total Alert', '5', const Color(0xFFEF4444)),
-      ],
-    );
-  }
-
-  Widget _buildMonthlyStats() {
-    return Row(
-      children: [
-        _buildStatCard('Rata-rata SpO₂', '95.9%', const Color(0xFF4FC3F7)),
-        const SizedBox(width: 8),
-        _buildStatCard('Rata-rata HR', '116 bpm', const Color(0xFF22C55E)),
-        const SizedBox(width: 8),
-        _buildStatCard('Total Alert', '12', const Color(0xFFEF4444)),
+        _buildStatCard(
+          lang.totalAlert,
+          '${stats['totalAlert']}',
+          const Color(0xFFEF4444),
+        ),
       ],
     );
   }
@@ -203,22 +202,9 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 9,
-                color: Color(0xFF94A3B8),
-              ),
-            ),
+            Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
+            Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
           ],
         ),
       ),
@@ -226,448 +212,494 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
   }
 
   // ========== CHART ==========
-  Widget _buildDailyChart() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'SpO₂ & HR — 24 jam',
-            style: TextStyle(
-              color: Color(0xFF1B3A5C),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 120,
-            child: CustomPaint(
-              painter: ChartPainter(
-                spo2Data: [98, 97, 94, 99, 96, 89, 97, 98],
-                hrData: [103, 108, 122, 100, 115, 162, 106, 99],
-                labels: ['00:00', '06:00', '12:00', '18:00'],
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('00:00', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('06:00', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('12:00', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('18:00', style: TextStyle(color: Colors.grey, fontSize: 9)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildLegend('SpO₂', const Color(0xFF4FC3F7)),
-              const SizedBox(width: 16),
-              _buildLegend('HR', const Color(0xFFFF6B6B)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeeklyChart() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'SpO₂ & HR — 7 Hari',
-            style: TextStyle(
-              color: Color(0xFF1B3A5C),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 120,
-            child: CustomPaint(
-              painter: ChartPainter(
-                spo2Data: [97.5, 96.2, 94.8, 97.0, 95.5, 93.0, 96.5],
-                hrData: [110, 115, 122, 108, 118, 130, 112],
-                labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Sen', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Sel', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Rab', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Kam', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Jum', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Sab', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Min', style: TextStyle(color: Colors.grey, fontSize: 9)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildLegend('SpO₂', const Color(0xFF4FC3F7)),
-              const SizedBox(width: 16),
-              _buildLegend('HR', const Color(0xFFFF6B6B)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMonthlyChart() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'SpO₂ & HR — 4 Minggu',
-            style: TextStyle(
-              color: Color(0xFF1B3A5C),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 120,
-            child: CustomPaint(
-              painter: ChartPainter(
-                spo2Data: [96.8, 95.2, 97.1, 94.5],
-                hrData: [112, 120, 108, 125],
-                labels: ['M1', 'M2', 'M3', 'M4'],
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Minggu 1', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Minggu 2', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Minggu 3', style: TextStyle(color: Colors.grey, fontSize: 9)),
-              Text('Minggu 4', style: TextStyle(color: Colors.grey, fontSize: 9)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildLegend('SpO₂', const Color(0xFF4FC3F7)),
-              const SizedBox(width: 16),
-              _buildLegend('HR', const Color(0xFFFF6B6B)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegend(String label, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 3,
-          color: color,
+  Widget _buildChart(AppLocalizations lang) {
+    if (_data.isEmpty) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF0E1E3C).withOpacity(0.07)),
         ),
+        child: const Center(
+          child: Text('Belum ada data', style: TextStyle(color: Colors.grey)),
+        ),
+      );
+    }
+
+    final stats = _calculateStats();
+    final avgSpo2 = stats['avgSpo2'] as double;
+    final labelInterval = _getLabelInterval();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _selectedFilter == 'Hari ini'
+                ? '${lang.spo2} & HR — 24 ${lang.jam}'
+                : _selectedFilter == 'Minggu ini'
+                ? '${lang.spo2} & HR — 7 ${lang.hari}'
+                : '${lang.spo2} & HR — 4 ${lang.minggu}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1B3A5C)),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 220,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 20,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey.withOpacity(0.15),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: labelInterval.toDouble(),
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= _data.length) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            _data[index].getTranslatedXLabel(lang),
+                            style: const TextStyle(fontSize: 9, color: Colors.grey),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(fontSize: 9, color: Colors.grey),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                ),
+                minX: 0,
+                maxX: _data.length - 1,
+                minY: 70,
+                maxY: 170,
+                lineBarsData: [
+                  // SpO2 Line (Biru)
+                  LineChartBarData(
+                    spots: _data.asMap().entries.map((entry) {
+                      return FlSpot(entry.key.toDouble(), entry.value.spo2);
+                    }).toList(),
+                    isCurved: true,
+                    color: const Color(0xFF4FC3F7),
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        final dataPoint = _data[index];
+                        Color dotColor;
+                        switch (dataPoint.status) {
+                          case 'critical':
+                            dotColor = Colors.red;
+                            break;
+                          case 'warning':
+                            dotColor = Colors.orange;
+                            break;
+                          default:
+                            dotColor = const Color(0xFF4FC3F7);
+                        }
+                        return FlDotCirclePainter(
+                          radius: 5,
+                          color: dotColor,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                  // HR Line (Hijau)
+                  LineChartBarData(
+                    spots: _data.asMap().entries.map((entry) {
+                      return FlSpot(entry.key.toDouble(), entry.value.hr);
+                    }).toList(),
+                    isCurved: true,
+                    color: const Color(0xFF22C55E),
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        final dataPoint = _data[index];
+                        Color dotColor;
+                        switch (dataPoint.status) {
+                          case 'critical':
+                            dotColor = Colors.red;
+                            break;
+                          case 'warning':
+                            dotColor = Colors.orange;
+                            break;
+                          default:
+                            dotColor = const Color(0xFF22C55E);
+                        }
+                        return FlDotCirclePainter(
+                          radius: 5,
+                          color: dotColor,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                  // Average Line (Merah Putus-putus)
+                  LineChartBarData(
+                    spots: [
+                      FlSpot(0, avgSpo2),
+                      FlSpot(_data.length - 1, avgSpo2),
+                    ],
+                    isCurved: false,
+                    color: Colors.red,
+                    barWidth: 1.5,
+                    isStrokeCapRound: true,
+                    dashArray: [8, 6],
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========== LEGEND ==========
+  Widget _buildLegend(AppLocalizations lang) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF0E1E3C).withOpacity(0.07)),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 12,
+        runSpacing: 6,
+        children: [
+          _buildLegendItem(lang.spo2, const Color(0xFF4FC3F7)),
+          _buildLegendItem('HR', const Color(0xFF22C55E)),
+          _buildLegendItem('${lang.rataRata} SpO₂', Colors.red, isDashed: true),
+          _buildLegendItem(lang.normal, Colors.green.shade700, isCircle: true),
+          _buildLegendItem(lang.warning, Colors.orange, isCircle: true),
+          _buildLegendItem(lang.kritis, Colors.red, isCircle: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color,
+      {bool isDashed = false, bool isCircle = false}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isCircle)
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          )
+        else if (isDashed)
+          Container(
+            width: 20,
+            height: 2,
+            color: Colors.transparent,
+            child: CustomPaint(
+              painter: DashedLinePainter(color: color),
+            ),
+          )
+        else
+          Container(
+            width: 20,
+            height: 3,
+            color: color,
+          ),
         const SizedBox(width: 4),
         Text(
           label,
           style: const TextStyle(
-            color: Colors.grey,
             fontSize: 10,
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
     );
   }
 
-  // ========== LOG ==========
-  Widget _buildDailyLog() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Log Pengukuran - Hari ini',
-            style: TextStyle(
-              color: Color(0xFF1B3A5C),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+  // ========== LOG TABLE ==========
+  Widget _buildLogTable(AppLocalizations lang) {
+    if (_data.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-          ),
-          const SizedBox(height: 12),
-          _buildLogTable(_logs),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeeklyLog() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Ringkasan Harian - Minggu ini',
-            style: TextStyle(
-              color: Color(0xFF1B3A5C),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildWeeklyTable(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMonthlyLog() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Ringkasan Mingguan - Bulan ini',
-            style: TextStyle(
-              color: Color(0xFF1B3A5C),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildMonthlyTable(),
-        ],
-      ),
-    );
-  }
-
-  // ========== TABLE LOG ==========
-  Widget _buildLogTable(List<Map<String, dynamic>> data) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildTableHeader('Time', flex: 1),
-            _buildTableHeader('SpO₂', flex: 1),
-            _buildTableHeader('HR', flex: 1),
-            _buildTableHeader('Status', flex: 1.5),
           ],
         ),
-        const SizedBox(height: 8),
-        ...data.map((log) => _buildLogRow(log)),
-      ],
-    );
-  }
-
-  Widget _buildWeeklyTable() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildTableHeader('Hari', flex: 1),
-            _buildTableHeader('SpO₂', flex: 1),
-            _buildTableHeader('HR', flex: 1),
-            _buildTableHeader('Status', flex: 1.5),
-          ],
+        child: Center(
+          child: Text(
+            'Tidak ada data',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
         ),
-        const SizedBox(height: 8),
-        ..._weeklyLogs.map((log) => _buildWeeklyRow(log)),
-      ],
-    );
-  }
-
-  Widget _buildMonthlyTable() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildTableHeader('Minggu', flex: 1),
-            _buildTableHeader('SpO₂', flex: 1),
-            _buildTableHeader('HR', flex: 1),
-            _buildTableHeader('Status', flex: 1.5),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ..._monthlyLogs.map((log) => _buildMonthlyRow(log)),
-      ],
-    );
-  }
-
-  Widget _buildTableHeader(String text, {double flex = 1}) {
-    return Expanded(
-      flex: flex.toInt(),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.grey,
-          fontWeight: FontWeight.bold,
-          fontSize: 11,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogRow(Map<String, dynamic> log) {
-    Color statusColor;
-    Color bgColor;
-
-    switch (log['status']) {
-      case 'Kritis':
-        statusColor = Colors.red;
-        bgColor = Colors.red.withOpacity(0.05);
-        break;
-      case 'Warning':
-        statusColor = Colors.orange;
-        bgColor = Colors.orange.withOpacity(0.05);
-        break;
-      default:
-        statusColor = Colors.green;
-        bgColor = Colors.transparent;
+      );
     }
 
-    final isKritis = log['status'] == 'Kritis';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${lang.logPengukuran} - ${_selectedFilter == 'Hari ini' ? lang.hariIni : _selectedFilter == 'Minggu ini' ? lang.mingguIni : lang.bulanIni}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B3A5C),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // HEADER TABLE
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                // Time
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Time',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // SpO2
+                Expanded(
+                  flex: 1,
+                  child: Text(
+                    lang.spo2,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // HR
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'HR',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Status
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    lang.status,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // LOG ROWS
+          ..._data.map((log) => _buildLogRow(log, lang)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogRow(RiwayatModel log, AppLocalizations lang) {
+    Color bgColor, borderColor, chipBg, chipTextColor;
+    String statusText;
+
+    switch (log.status) {
+      case 'warning':
+        bgColor = const Color(0xFFFFFBEB).withOpacity(0.6);
+        borderColor = const Color(0xFFF59E0B).withOpacity(0.3);
+        statusText = lang.warning;
+        chipBg = const Color(0xFFFDE68A).withOpacity(0.7);
+        chipTextColor = const Color(0xFF92400E);
+        break;
+      case 'critical':
+        bgColor = const Color(0xFFFFF5F5).withOpacity(0.6);
+        borderColor = const Color(0xFFEF4444).withOpacity(0.3);
+        statusText = lang.kritis;
+        chipBg = const Color(0xFFFEE2E2).withOpacity(0.7);
+        chipTextColor = const Color(0xFFEF4444);
+        break;
+      default:
+        bgColor = Colors.white.withOpacity(0.6);
+        borderColor = Colors.transparent;
+        statusText = lang.normal;
+        chipBg = const Color(0xFFD1FAE5).withOpacity(0.7);
+        chipTextColor = const Color(0xFF22C55E);
+    }
+
+    final displayLabel = log.getTranslatedLabel(lang);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isKritis ? Colors.red.withOpacity(0.2) : Colors.grey.withOpacity(0.05),
+          color: borderColor == Colors.transparent
+              ? Colors.grey.withOpacity(0.05)
+              : borderColor,
         ),
       ),
       child: Row(
         children: [
+          // Time
           Expanded(
-            flex: 1,
+            flex: 2,
             child: Text(
-              log['time'],
+              displayLabel,
               style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
                 color: Color(0xFF64748B),
-                fontSize: 12,
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          // SpO2
           Expanded(
             flex: 1,
             child: Text(
-              '${log['spo2']}%',
+              '${log.spo2.toInt()}%',
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: isKritis ? FontWeight.bold : FontWeight.w500,
-                color: isKritis ? Colors.red : const Color(0xFF1B3A5C),
+                fontWeight: FontWeight.w600,
+                color: log.status == 'critical' ? Colors.red : const Color(0xFF1B3A5C),
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          // HR
           Expanded(
-            flex: 1,
+            flex: 2,
             child: Text(
-              '${log['hr']} bpm',
+              '${log.hr.toInt()} bpm',
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: isKritis ? FontWeight.bold : FontWeight.w500,
-                color: isKritis ? Colors.red : const Color(0xFF1B3A5C),
+                fontWeight: FontWeight.w600,
+                color: log.status == 'critical' ? Colors.red : const Color(0xFF1B3A5C),
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          // Status - RATA TENGAH
           Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                log['status'],
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
+            flex: 2,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: chipBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  statusText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: chipTextColor,
+                  ),
                 ),
               ),
             ),
@@ -677,259 +709,133 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     );
   }
 
-  Widget _buildWeeklyRow(Map<String, dynamic> log) {
-    Color statusColor;
-    switch (log['status']) {
-      case 'Kritis':
-        statusColor = Colors.red;
-        break;
-      case 'Warning':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = Colors.green;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Text(
-              log['day'],
-              style: const TextStyle(
-                color: Color(0xFF1B3A5C),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+  void _showExportDialog(BuildContext context, AppLocalizations lang) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B3A5C).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.file_download, color: Color(0xFF1B3A5C), size: 32),
               ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              '${log['spo2']}%',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF1B3A5C),
+              const SizedBox(height: 16),
+              Text(
+                lang.exportPDFTitle,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B3A5C)),
               ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              '${log['hr']} bpm',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF1B3A5C),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                log['status'],
+              const SizedBox(height: 8),
+              Text(
+                lang.exportPDFSubtitle,
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withOpacity(0.1)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        lang.exportPDFInfo,
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMonthlyRow(Map<String, dynamic> log) {
-    Color statusColor;
-    switch (log['status']) {
-      case 'Kritis':
-        statusColor = Colors.red;
-        break;
-      case 'Warning':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = Colors.green;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Text(
-              log['week'],
-              style: const TextStyle(
-                color: Color(0xFF1B3A5C),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        lang.batal,
+                        style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(lang.exportPDFSuccess),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1B3A5C),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        lang.exportPDF,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+            ],
           ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              '${log['spo2']}%',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF1B3A5C),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              '${log['hr']} bpm',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF1B3A5C),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                log['status'],
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _exportPDF(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Export PDF sedang dalam pengembangan'),
-        backgroundColor: Colors.orange,
+        ),
       ),
     );
   }
 }
 
-// ========== CHART PAINTER ==========
-class ChartPainter extends CustomPainter {
-  final List<double> spo2Data;
-  final List<double> hrData;
-  final List<String> labels;
+// ========== DASHED LINE PAINTER ==========
+class DashedLinePainter extends CustomPainter {
+  final Color color;
 
-  ChartPainter({
-    required this.spo2Data,
-    required this.hrData,
-    required this.labels,
-  });
+  DashedLinePainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintSpo2 = Paint()
-      ..color = const Color(0xFF4FC3F7)
-      ..strokeWidth = 2
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    final paintHr = Paint()
-      ..color = const Color(0xFFFF6B6B)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final width = size.width;
-    final height = size.height;
-
-    // Grid lines
-    final gridPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.1)
-      ..strokeWidth = 1;
-
-    for (int i = 0; i < 4; i++) {
-      final y = (i / 3) * height;
-      canvas.drawLine(Offset(0, y), Offset(width, y), gridPaint);
-    }
-
-    // Find min/max for scaling
-    final allValues = [...spo2Data, ...hrData];
-    final minVal = allValues.reduce((a, b) => a < b ? a : b) - 5;
-    final maxVal = allValues.reduce((a, b) => a > b ? a : b) + 5;
-    final range = maxVal - minVal;
-
-    // SpO2 Line
-    final pathSpo2 = Path();
-    for (int i = 0; i < spo2Data.length; i++) {
-      final x = (i / (spo2Data.length - 1)) * width;
-      final y = height - ((spo2Data[i] - minVal) / range) * height;
-      if (i == 0) {
-        pathSpo2.moveTo(x, y);
-      } else {
-        pathSpo2.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(pathSpo2, paintSpo2);
-
-    // HR Line
-    final pathHr = Path();
-    for (int i = 0; i < hrData.length; i++) {
-      final x = (i / (hrData.length - 1)) * width;
-      final y = height - ((hrData[i] - minVal) / range) * height;
-      if (i == 0) {
-        pathHr.moveTo(x, y);
-      } else {
-        pathHr.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(pathHr, paintHr);
-
-    // Y-axis labels
-    final labelsY = [maxVal.toStringAsFixed(0), ((maxVal + minVal) / 2).toStringAsFixed(0), minVal.toStringAsFixed(0)];
-    final textStyle = TextStyle(
-      fontSize: 7,
-      color: Colors.grey.shade500,
-    );
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    for (int i = 0; i < labelsY.length; i++) {
-      final y = height - (i / (labelsY.length - 1)) * height;
-      textPainter.text = TextSpan(text: labelsY[i], style: textStyle);
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(0, y - 3));
+    const dashWidth = 6;
+    const dashSpace = 4;
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(
+        Offset(startX, size.height / 2),
+        Offset(startX + dashWidth, size.height / 2),
+        paint,
+      );
+      startX += dashWidth + dashSpace;
     }
   }
 
   @override
-  bool shouldRepaint(covariant ChartPainter oldDelegate) {
-    return oldDelegate.spo2Data != spo2Data ||
-        oldDelegate.hrData != hrData ||
-        oldDelegate.labels != labels;
-  }
+  bool shouldRepaint(covariant DashedLinePainter oldDelegate) => false;
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 class NotifikasiProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _notifikasi = [];
+  int _idCounter = 5;
 
   NotifikasiProvider() {
     _loadNotifikasi();
@@ -13,9 +14,10 @@ class NotifikasiProvider extends ChangeNotifier {
       {
         'id': '1',
         'title': 'SpO₂ Kritis!',
-        'body': 'SpO₂ Budi turun ke 89% — perlu tindakan segera',
+        'body': 'SpO₂ Budi turun ke 89% — 17 Jun, 02:14',
         'time': '17 Jun, 02:14',
         'read': false,
+        'type': 'critical',
       },
       {
         'id': '2',
@@ -23,6 +25,7 @@ class NotifikasiProvider extends ChangeNotifier {
         'body': 'HR Budi mencapai 162 bpm — perlu pantauan',
         'time': '17 Jun, 02:13',
         'read': false,
+        'type': 'warning',
       },
       {
         'id': '3',
@@ -30,6 +33,7 @@ class NotifikasiProvider extends ChangeNotifier {
         'body': 'Tetap pantau dan beri inhalasi jika sesak.',
         'time': '09:18',
         'read': true,
+        'type': 'info',
       },
       {
         'id': '4',
@@ -37,8 +41,36 @@ class NotifikasiProvider extends ChangeNotifier {
         'body': 'Laporan monitoring 16 Jun sudah tersedia.',
         'time': 'Kemarin',
         'read': true,
+        'type': 'info',
       },
     ];
+  }
+
+  // 🔥 TAMBAHKAN NOTIFIKASI DARI SMARTWATCH
+  void addNotification({
+    required String title,
+    required String body,
+    required String time,
+    required String type,
+  }) {
+    // Cek apakah notifikasi dengan title yang sama sudah ada (hindari duplikat)
+    final exists = _notifikasi.any((n) =>
+    n['title'] == title &&
+        n['body'] == body &&
+        n['read'] == false
+    );
+
+    if (!exists) {
+      _notifikasi.insert(0, {
+        'id': '${_idCounter++}',
+        'title': title,
+        'body': body,
+        'time': time,
+        'read': false,
+        'type': type,
+      });
+      notifyListeners();
+    }
   }
 
   List<Map<String, dynamic>> getAllNotifikasi() => _notifikasi;

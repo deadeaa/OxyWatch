@@ -1,11 +1,13 @@
 // main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/emergency_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/notifikasi_provider.dart';
 import 'providers/monitoring_provider.dart';
+import 'providers/language_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/chat_list_screen.dart';
 import 'screens/riwayat_screen.dart';
@@ -15,6 +17,7 @@ import 'screens/emergency_monitor_screen.dart';
 import 'screens/onboarding_profile_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'utils/languages.dart';
 
 void main() {
   runApp(
@@ -24,6 +27,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => NotifikasiProvider()),
         ChangeNotifierProvider(create: (_) => MonitoringProvider()),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
       ],
       child: const MyApp(),
     ),
@@ -35,11 +39,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageProvider = context.watch<LanguageProvider>();
+
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
         return MaterialApp(
           title: 'OxyWatch',
           debugShowCheckedModeBanner: false,
+          locale: Locale(languageProvider.currentLanguage),
+          supportedLocales: const [Locale('id'), Locale('en')],
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
           theme: ThemeData(
             primaryColor: const Color(0xFF1B3A5C),
             scaffoldBackgroundColor: const Color(0xFFF5F7FA),
@@ -75,12 +88,10 @@ class MyApp extends StatelessWidget {
             ),
             useMaterial3: true,
           ),
-          // 🔥 INITIAL ROUTE: SPLASH SCREEN
           initialRoute: '/splash',
           routes: {
             '/splash': (context) => SplashScreen(
               onNext: () {
-                // Navigasi ke halaman berikutnya setelah splash
                 final authProvider = context.read<AuthProvider>();
                 if (authProvider.isLoggedIn) {
                   if (authProvider.isProfileCompleted) {
@@ -93,7 +104,6 @@ class MyApp extends StatelessWidget {
                 }
               },
               onBack: () {
-                // Kembali ke halaman sebelumnya (jika ada)
                 Navigator.pop(context);
               },
             ),
@@ -127,6 +137,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = AppLocalizations.of(context)!;
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
@@ -140,26 +152,26 @@ class _MainScreenState extends State<MainScreen> {
           });
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Dashboard',
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: lang.bottomDashboard,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat_outlined),
-            activeIcon: Icon(Icons.chat),
-            label: 'Chat',
+            icon: const Icon(Icons.chat_outlined),
+            activeIcon: const Icon(Icons.chat),
+            label: lang.bottomChat,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history),
-            label: 'Riwayat',
+            icon: const Icon(Icons.history_outlined),
+            activeIcon: const Icon(Icons.history),
+            label: lang.bottomRiwayat,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profil',
+            icon: const Icon(Icons.person_outline),
+            activeIcon: const Icon(Icons.person),
+            label: lang.bottomProfil,
           ),
         ],
       ),

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/languages.dart';
 
 class PatientCard extends StatelessWidget {
   const PatientCard({super.key});
@@ -9,6 +10,7 @@ class PatientCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final lang = AppLocalizations.of(context)!;
     final isProfileEmpty = auth.nama.isEmpty && auth.usia.isEmpty;
 
     String initials = '?';
@@ -66,9 +68,9 @@ class PatientCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Belum ada profil',
-                    style: TextStyle(
+                  Text(
+                    lang.belumAdaProfil,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -76,7 +78,7 @@ class PatientCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Isi profil anak terlebih dahulu',
+                    lang.fillProfileFirst,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.7),
                       fontSize: 13,
@@ -90,7 +92,6 @@ class PatientCard extends StatelessWidget {
       );
     }
 
-    // 🔥 TAMPILAN JIKA ADA PROFIL - SEMUA DATA MUNCUL
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -111,7 +112,6 @@ class PatientCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar
           Container(
             width: 56,
             height: 56,
@@ -131,15 +131,13 @@ class PatientCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // 🔥 MIDDLE SECTION - Info Pasien
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // NAMA - 1 baris, ellipsis
                 Text(
-                  auth.nama.isNotEmpty ? auth.nama : 'Belum diisi',
+                  auth.nama.isNotEmpty ? auth.nama : lang.belumDiisi,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -149,14 +147,13 @@ class PatientCard extends StatelessWidget {
                   maxLines: 1,
                 ),
                 const SizedBox(height: 2),
-                // 🔥 USIA + BB + ID - 1 baris, pakai Wrap
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 6,
                   runSpacing: 2,
                   children: [
                     Text(
-                      '${auth.usia.isNotEmpty ? auth.usia : '?'} tahun · ${auth.bb.isNotEmpty ? auth.bb : '?'} kg',
+                      '${auth.usia.isNotEmpty ? auth.usia : '?'} ${lang.tahun} · ${auth.bb.isNotEmpty ? auth.bb : '?'} kg',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 13,
@@ -182,12 +179,10 @@ class PatientCard extends StatelessWidget {
               ],
             ),
           ),
-          // 🔥 RIGHT SECTION - Status Watch
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Device name - 1 baris, ellipsis
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -200,7 +195,7 @@ class PatientCard extends StatelessWidget {
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 100),
                     child: Text(
-                      auth.watchConnected ? deviceName : 'Tidak terhubung',
+                      auth.watchConnected ? deviceName : lang.tidakTerhubung,
                       style: TextStyle(
                         color: auth.watchConnected ? Colors.white : Colors.white.withOpacity(0.5),
                         fontSize: 10,
@@ -212,7 +207,6 @@ class PatientCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              // Status badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -231,7 +225,7 @@ class PatientCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      auth.watchConnected ? 'Terhubung' : 'Tidak terhubung',
+                      auth.watchConnected ? lang.terhubung : lang.tidakTerhubung,
                       style: TextStyle(
                         fontSize: 9,
                         color: auth.watchConnected ? Colors.white : Colors.white.withOpacity(0.5),

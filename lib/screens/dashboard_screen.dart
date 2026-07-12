@@ -6,9 +6,11 @@ import '../providers/notifikasi_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/patient_card.dart';
 import '../widgets/risk_score_card.dart';
+import '../widgets/trend_chart.dart';
 import '../screens/emergency_monitor_screen.dart';
 import '../screens/notifikasi_screen.dart';
 import '../screens/pengaturan_screen.dart';
+import '../utils/languages.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -16,15 +18,17 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final lang = AppLocalizations.of(context)!;
     final isProfileEmpty = auth.nama.isEmpty && auth.usia.isEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: Text(lang.dashboard),
         backgroundColor: const Color(0xFF1B3A5C),
         elevation: 0,
         actions: [
+          // 🔥 NOTIFIKASI - BADGE HANYA MUNCUL KALAU ADA PROFIL
           Consumer<NotifikasiProvider>(
             builder: (context, notifProvider, child) {
               return Stack(
@@ -40,7 +44,10 @@ class DashboardScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  if (notifProvider.belumDibaca > 0)
+                  // 🔥 BADGE HANYA MUNCUL KALAU:
+                  // 1. Profil TIDAK kosong
+                  // 2. Ada notifikasi belum dibaca
+                  if (!isProfileEmpty && notifProvider.belumDibaca > 0)
                     Positioned(
                       right: 8,
                       top: 8,
@@ -88,19 +95,18 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔥 PATIENT CARD - PAKAI DATA DARI AUTH
               PatientCard(),
               const SizedBox(height: 16),
 
-              // Vital Signs Row - PAKAI DATA DARI AUTH
+              // Vital Signs Row
               Row(
                 children: [
                   Expanded(
                     child: _buildVitalCard(
-                      title: 'SpO₂',
+                      title: lang.spo2,
                       value: isProfileEmpty ? '-' : '98',
                       unit: isProfileEmpty ? '' : '%',
-                      status: isProfileEmpty ? 'Belum ada' : 'Normal',
+                      status: isProfileEmpty ? lang.belumAdaData : lang.normal,
                       statusColor: isProfileEmpty ? Colors.grey : Colors.green,
                       icon: Icons.bloodtype,
                       isEmpty: isProfileEmpty,
@@ -109,10 +115,10 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildVitalCard(
-                      title: 'Detak jantung',
+                      title: lang.heartRate,
                       value: isProfileEmpty ? '-' : '105',
                       unit: isProfileEmpty ? '' : 'bpm',
-                      status: isProfileEmpty ? 'Belum ada' : 'Normal',
+                      status: isProfileEmpty ? lang.belumAdaData : lang.normal,
                       statusColor: isProfileEmpty ? Colors.grey : Colors.green,
                       icon: Icons.favorite,
                       isEmpty: isProfileEmpty,
@@ -124,74 +130,12 @@ class DashboardScreen extends StatelessWidget {
 
               // Risk Score Card
               isProfileEmpty
-                  ? _buildEmptyCard('Belum ada data risk score')
+                  ? _buildEmptyCard(lang.belumAdaRiskScore)
                   : const RiskScoreCard(),
               const SizedBox(height: 16),
 
-              // 🔥 TREN 7 HARI - FIX PADDING
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF0E1E3C).withOpacity(0.07)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Tren 7 Hari',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1B3A5C),
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            _buildLegendItem('SpO₂', const Color(0xFF4FC3F7)),
-                            const SizedBox(width: 12),
-                            _buildLegendItem('HR', const Color(0xFF22C55E)),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (isProfileEmpty)
-                      _buildEmptyChart()
-                    else
-                    // 🔥 TAMBAHKAN PADDING KIRI UNTUK LABEL
-                      Padding(
-                        padding: const EdgeInsets.only(left: 20),
-                        child: SizedBox(
-                          height: 100,
-                          child: CustomPaint(
-                            painter: TrendChartPainter(
-                              spo2Data: [98, 97, 95, 96, 94, 93, 95],
-                              hrData: [105, 108, 112, 115, 120, 125, 118],
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text('Sen', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text('Sel', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text('Rab', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text('Kam', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text('Jum', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text('Sab', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                        Text('Min', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              // 🔥 TREND CHART
+              const TrendChart(),
               const SizedBox(height: 16),
 
               // Tombol Emergency
@@ -227,7 +171,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        isProfileEmpty ? 'Isi profil terlebih dahulu' : '🚨 Emergency',
+                        isProfileEmpty ? lang.fillProfileFirst : lang.emergencyLabel,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -330,29 +274,6 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 3,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Color(0xFF94A3B8),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildEmptyCard(String message) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -378,111 +299,5 @@ class DashboardScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Widget _buildEmptyChart() {
-    return Container(
-      height: 100,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Center(
-        child: Text(
-          'Belum ada data',
-          style: TextStyle(
-            color: Color(0xFF94A3B8),
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ========== TREND CHART PAINTER - FIX ==========
-class TrendChartPainter extends CustomPainter {
-  final List<double> spo2Data;
-  final List<double> hrData;
-
-  TrendChartPainter({
-    required this.spo2Data,
-    required this.hrData,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final width = size.width;
-    final height = size.height;
-
-    // 🔥 GRID LINES
-    final gridPaint = Paint()
-      ..color = const Color(0xFF0E1E3C).withOpacity(0.05)
-      ..strokeWidth = 0.5;
-
-    for (int i = 0; i < 4; i++) {
-      final y = (i / 3) * height;
-      canvas.drawLine(Offset(0, y), Offset(width, y), gridPaint);
-    }
-
-    // 🔥 SPO2 LINE
-    final paintSpo2 = Paint()
-      ..color = const Color(0xFF4FC3F7)
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final pathSpo2 = Path();
-    for (int i = 0; i < spo2Data.length; i++) {
-      final x = (i / (spo2Data.length - 1)) * width;
-      final y = height - ((spo2Data[i] - 90) / 10) * height;
-      if (i == 0) {
-        pathSpo2.moveTo(x, y);
-      } else {
-        pathSpo2.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(pathSpo2, paintSpo2);
-
-    // 🔥 HR LINE
-    final paintHr = Paint()
-      ..color = const Color(0xFF22C55E)
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final pathHr = Path();
-    for (int i = 0; i < hrData.length; i++) {
-      final x = (i / (hrData.length - 1)) * width;
-      final y = height - ((hrData[i] - 100) / 30) * height;
-      if (i == 0) {
-        pathHr.moveTo(x, y);
-      } else {
-        pathHr.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(pathHr, paintHr);
-
-    // 🔥 Y-AXIS LABELS - di dalam kotak
-    const labels = ['0', '60', '120'];
-    final textStyle = TextStyle(
-      fontSize: 8,
-      color: const Color(0xFF94A3B8),
-      fontWeight: FontWeight.w400,
-    );
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    for (int i = 0; i < labels.length; i++) {
-      final y = height - (i / (labels.length + 0.4)) * height;
-      textPainter.text = TextSpan(text: labels[i], style: textStyle);
-      textPainter.layout();
-      // 🔥 POSISI LABEL - di DALAM grafik (tidak keluar)
-      textPainter.paint(canvas, Offset(-17, y - 24));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant TrendChartPainter oldDelegate) {
-    return oldDelegate.spo2Data != spo2Data || oldDelegate.hrData != hrData;
   }
 }

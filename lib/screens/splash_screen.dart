@@ -1,6 +1,7 @@
 // screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../utils/languages.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback onNext;
@@ -52,6 +53,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final lang = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1B3A5C),
       body: SafeArea(
@@ -60,18 +63,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ========== LOGO & TITLE (TENGAH) ==========
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo dengan pulse rings
                   SizedBox(
                     width: 80,
                     height: 80,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Pulse ring 1
                         TweenAnimationBuilder(
                           duration: const Duration(milliseconds: 1400),
                           tween: Tween<double>(begin: 0.8, end: 1.2),
@@ -93,7 +93,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           },
                           onEnd: () {},
                         ),
-                        // Pulse ring 2 (delay)
                         TweenAnimationBuilder(
                           duration: const Duration(milliseconds: 1400),
                           tween: Tween<double>(begin: 0.8, end: 1.2),
@@ -115,7 +114,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           },
                           onEnd: () {},
                         ),
-                        // Logo box
                         Container(
                           width: 64,
                           height: 64,
@@ -146,10 +144,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 20),
-
-                  // Title
                   const Text(
                     'OxyWatch',
                     style: TextStyle(
@@ -162,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'AI monitoring untuk si kecil',
+                    lang.aiMonitoring,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
@@ -172,13 +167,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                 ],
               ),
-
               const SizedBox(height: 60),
-
-              // ========== DOT LOADER & VERSION ==========
               Column(
                 children: [
-                  // Dot loader
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(3, (index) {
@@ -198,12 +189,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     }),
                   ),
                   const SizedBox(height: 24),
-                  Text(
+                  const Text(
                     'v1.0',
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 10,
-                      color: const Color(0xFF475569),
+                      color: Color(0xFF475569),
                     ),
                   ),
                 ],
@@ -216,7 +207,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 }
 
-// ========== CUSTOM PAINTER UNTUK OXYGEN RING ==========
 class OxygenRingPainter extends CustomPainter {
   final double progress;
 
@@ -227,7 +217,6 @@ class OxygenRingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = 14.0;
 
-    // Outer ring (background)
     final bgPaint = Paint()
       ..color = const Color(0xFF4FC3F7).withOpacity(0.2)
       ..strokeWidth = 2
@@ -235,7 +224,6 @@ class OxygenRingPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, bgPaint);
 
-    // Animated ring
     final ringPaint = Paint()
       ..color = const Color(0xFF4FC3F7)
       ..strokeWidth = 2
@@ -251,7 +239,6 @@ class OxygenRingPainter extends CustomPainter {
       ringPaint,
     );
 
-    // Center dot
     final dotPaint = Paint()
       ..color = const Color(0xFF4FC3F7).withOpacity(0.9);
 

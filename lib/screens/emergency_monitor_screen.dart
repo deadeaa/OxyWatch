@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/emergency_provider.dart';
 import '../providers/monitoring_provider.dart';
+import '../utils/languages.dart';
 
 class EmergencyMonitorScreen extends StatefulWidget {
   const EmergencyMonitorScreen({super.key});
@@ -26,22 +27,6 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
     {'date': '12 Jun 2025', 'time': '10:00', 'spo2': '90%', 'status': 'Kritis'},
   ];
 
-  final List<Map<String, String>> _inhalerSteps = [
-    {'title': '1. Lepaskan Tutup', 'desc': 'Buka tutup inhaler dan kocok perlahan selama 3-5 detik'},
-    {'title': '2. Posisikan', 'desc': 'Pegang inhaler tegak, letakkan di antara jari telunjuk dan ibu jari'},
-    {'title': '3. Buang Napas', 'desc': 'Buang napas pelan melalui mulut sampai paru-paru kosong'},
-    {'title': '4. Hisap & Semprot', 'desc': 'Masukkan ujung ke mulut, hisap napas dalam sambil menekan inhaler'},
-    {'title': '5. Tahan Napas', 'desc': 'Tahan napas selama 10 detik, lalu hembuskan pelan'},
-  ];
-
-  final List<Map<String, String>> _cprSteps = [
-    {'title': '1. Periksa Kesadaran', 'desc': 'Tepuk bahu dan panggil nama anak dengan keras'},
-    {'title': '2. Panggil Bantuan', 'desc': 'Minta orang lain untuk memanggil ambulans (119)'},
-    {'title': '3. Buka Jalan Napas', 'desc': 'Tengadahkan kepala, angkat dagu untuk membuka jalan napas'},
-    {'title': '4. Periksa Napas', 'desc': 'Dengar dan rasakan napas selama 10 detik'},
-    {'title': '5. Kompresi Dada', 'desc': 'Kompresi dada 30 kali dengan kedalaman 5 cm, kecepatan 100-120/menit'},
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -49,6 +34,15 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
       duration: const Duration(milliseconds: 700),
       vsync: this,
     )..repeat(reverse: true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final emergencyProvider = context.read<EmergencyProvider>();
+      if (emergencyProvider.isEmergency) {
+        setState(() {
+          _currentView = 'emergency';
+        });
+      }
+    });
   }
 
   @override
@@ -58,6 +52,12 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   void _resetToNormal() {
+    final emergencyProvider = context.read<EmergencyProvider>();
+    final monitoringProvider = context.read<MonitoringProvider>();
+
+    emergencyProvider.deactivateEmergency();
+    monitoringProvider.resetEmergency();
+
     setState(() {
       _currentView = 'normal';
       _currentStep = 0;
@@ -66,6 +66,12 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   void _goToEmergency() {
+    final emergencyProvider = context.read<EmergencyProvider>();
+    final monitoringProvider = context.read<MonitoringProvider>();
+
+    emergencyProvider.triggerEmergency();
+    monitoringProvider.simulateEmergency(context);
+
     setState(() {
       _currentView = 'emergency';
       _currentStep = 0;
@@ -88,19 +94,20 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   void _nextStep() {
-    final steps = _guideType == 'inhaler' ? _inhalerSteps : _cprSteps;
+    final steps = _guideType == 'inhaler' ? _getInhalerSteps() : _getCprSteps();
     if (_currentStep < steps.length - 1) {
       setState(() {
         _currentStep++;
       });
     } else {
       _goBackToEmergency();
+      final lang = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             _guideType == 'inhaler'
-                ? '✅ Inhaler berhasil digunakan! Tetap pantau kondisi.'
-                : '🆘 Bantuan telah diberikan! Segera hubungi tenaga medis.',
+                ? lang.inhalerSuccess
+                : lang.cprSuccess,
           ),
           backgroundColor: Colors.green,
         ),
@@ -116,25 +123,60 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
     }
   }
 
+  // ========== GET STEPS WITH LANGUAGE ==========
+  List<Map<String, String>> _getInhalerSteps() {
+    final lang = AppLocalizations.of(context)!;
+    return [
+      {'title': '1. ${lang.inhalerStep1Title}', 'desc': lang.inhalerStep1Desc},
+      {'title': '2. ${lang.inhalerStep2Title}', 'desc': lang.inhalerStep2Desc},
+      {'title': '3. ${lang.inhalerStep3Title}', 'desc': lang.inhalerStep3Desc},
+      {'title': '4. ${lang.inhalerStep4Title}', 'desc': lang.inhalerStep4Desc},
+      {'title': '5. ${lang.inhalerStep5Title}', 'desc': lang.inhalerStep5Desc},
+    ];
+  }
+
+  List<Map<String, String>> _getCprSteps() {
+    final lang = AppLocalizations.of(context)!;
+    return [
+      {'title': '1. ${lang.cprStep1Title}', 'desc': lang.cprStep1Desc},
+      {'title': '2. ${lang.cprStep2Title}', 'desc': lang.cprStep2Desc},
+      {'title': '3. ${lang.cprStep3Title}', 'desc': lang.cprStep3Desc},
+      {'title': '4. ${lang.cprStep4Title}', 'desc': lang.cprStep4Desc},
+      {'title': '5. ${lang.cprStep5Title}', 'desc': lang.cprStep5Desc},
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lang = AppLocalizations.of(context)!;
+    final emergencyProvider = context.watch<EmergencyProvider>();
+    final monitoringProvider = context.watch<MonitoringProvider>();
+
+    if (emergencyProvider.isEmergency && _currentView != 'emergency' && _currentView != 'guide') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _currentView = 'emergency';
+        });
+      });
+    }
+
     if (_currentView == 'guide') {
-      return _buildStepByStepGuide();
+      return _buildStepByStepGuide(lang);
     }
 
-    if (_currentView == 'emergency') {
-      return _buildEmergencyView();
+    if (_currentView == 'emergency' || emergencyProvider.isEmergency) {
+      return _buildEmergencyView(lang);
     }
 
-    return _buildNormalView();
+    return _buildNormalView(lang);
   }
 
   // ========== NORMAL VIEW ==========
-  Widget _buildNormalView() {
+  Widget _buildNormalView(AppLocalizations lang) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Monitor Darurat'),
+        title: Text(lang.monitorDarurat),
         backgroundColor: const Color(0xFF1B3A5C),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -154,9 +196,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Text(
-                  'Aman',
-                  style: TextStyle(
+                Text(
+                  lang.aman,
+                  style: const TextStyle(
                     color: Color(0xFF22C55E),
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -204,16 +246,16 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Kondisi Normal',
-                          style: TextStyle(
+                        Text(
+                          lang.kondisiNormal,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         Text(
-                          'AI OxyWatch memantau secara aktif',
+                          lang.aiMonitoring,
                           style: TextStyle(
                             color: const Color(0xFF94A3B8).withOpacity(0.8),
                             fontSize: 11,
@@ -222,9 +264,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                       ],
                     ),
                   ),
-                  const Text(
-                    'Live',
-                    style: TextStyle(
+                  Text(
+                    lang.live,
+                    style: const TextStyle(
                       color: Color(0xFF94A3B8),
                       fontSize: 10,
                     ),
@@ -245,9 +287,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'AMBANG BATAS DARURAT',
-                    style: TextStyle(
+                  Text(
+                    lang.ambangBatasDarurat,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF94A3B8),
@@ -255,20 +297,20 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildThresholdRow('SpO₂ < 94% → Alert Kritis', true),
+                  _buildThresholdRow('SpO₂ < 94% → ${lang.alertKritis}', true),
                   const SizedBox(height: 4),
-                  _buildThresholdRow('HR > 140 bpm → Alert Kritis', true),
+                  _buildThresholdRow('HR > 140 bpm → ${lang.alertKritis}', true),
                 ],
               ),
             ),
             const SizedBox(height: 12),
 
-            // 🔥 INFO PENTING - TAMBAHAN
-            _buildInfoSection(),
+            // INFO SECTION
+            _buildInfoSection(lang),
 
             const SizedBox(height: 12),
 
-            // 🔥 TOMBOL SIMULASI
+            // TOMBOL SIMULASI
             GestureDetector(
               onTap: _goToEmergency,
               child: Container(
@@ -281,12 +323,12 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 16),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 16),
+                    const SizedBox(width: 8),
                     Text(
-                      '⚠️ Simulasi Kondisi Darurat',
-                      style: TextStyle(
+                      lang.simulasiDarurat,
+                      style: const TextStyle(
                         color: Color(0xFFEF4444),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -304,7 +346,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   // ========== INFO SECTION ==========
-  Widget _buildInfoSection() {
+  Widget _buildInfoSection(AppLocalizations lang) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -318,9 +360,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
           children: [
             const Icon(Icons.info_outline, color: Color(0xFF4FC3F7), size: 18),
             const SizedBox(width: 8),
-            const Text(
-              'Info & Tips Penting',
-              style: TextStyle(
+            Text(
+              lang.infoTips,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF1B3A5C),
@@ -344,9 +386,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   children: [
                     const Icon(Icons.phone, color: Color(0xFFEF4444), size: 14),
                     const SizedBox(width: 6),
-                    const Text(
-                      'KONTAK DARURAT',
-                      style: TextStyle(
+                    Text(
+                      lang.emergencyContacts.toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFFEF4444),
@@ -356,9 +398,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   ],
                 ),
                 const SizedBox(height: 4),
-                _buildContactRow('🏥 Ambulans', '119'),
+                _buildContactRow('🏥 ${lang.ambulance}', '119'),
                 _buildContactRow('🚑 PMI', '1500-567'),
-                _buildContactRow('👨‍⚕️ Dokter Anak', '021-1234567'),
+                _buildContactRow('👨‍⚕️ ${lang.pediatrician}', '021-1234567'),
               ],
             ),
           ),
@@ -379,9 +421,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   children: [
                     const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 14),
                     const SizedBox(width: 6),
-                    const Text(
-                      'GEJALA YANG PERLU DIWASPADAI',
-                      style: TextStyle(
+                    Text(
+                      lang.symptomsToWatch.toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF92400E),
@@ -391,10 +433,10 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('• Sesak napas / napas berbunyi (wheezing)', style: _gejalaStyle()),
-                Text('• Bibir atau wajah membiru (sianosis)', style: _gejalaStyle()),
-                Text('• Batuk terus-menerus atau suara serak', style: _gejalaStyle()),
-                Text('• Napas cepat (>40 kali/menit untuk anak)', style: _gejalaStyle()),
+                Text('• ${lang.symptom1}', style: _gejalaStyle()),
+                Text('• ${lang.symptom2}', style: _gejalaStyle()),
+                Text('• ${lang.symptom3}', style: _gejalaStyle()),
+                Text('• ${lang.symptom4}', style: _gejalaStyle()),
               ],
             ),
           ),
@@ -415,9 +457,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   children: [
                     const Icon(Icons.lightbulb, color: Color(0xFF4FC3F7), size: 14),
                     const SizedBox(width: 6),
-                    const Text(
-                      'TIPS PENCEGAHAN',
-                      style: TextStyle(
+                    Text(
+                      lang.preventionTips.toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1B3A5C),
@@ -427,9 +469,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('• Hindari paparan asap rokok dan debu', style: _tipsStyle()),
-                Text('• Pastikan inhaler selalu tersedia dan siap pakai', style: _tipsStyle()),
-                Text('• Pantau kondisi secara rutin dengan OxyWatch', style: _tipsStyle()),
+                Text('• ${lang.tip1}', style: _tipsStyle()),
+                Text('• ${lang.tip2}', style: _tipsStyle()),
+                Text('• ${lang.tip3}', style: _tipsStyle()),
               ],
             ),
           ),
@@ -450,9 +492,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   children: [
                     const Icon(Icons.history, color: Color(0xFF64748B), size: 14),
                     const SizedBox(width: 6),
-                    const Text(
-                      'RIWAYAT SERANGAN TERAKHIR',
-                      style: TextStyle(
+                    Text(
+                      lang.attackHistory.toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF64748B),
@@ -512,6 +554,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   Widget _buildContactRow(String name, String number) {
+    final lang = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Row(
@@ -537,7 +580,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('📞 Memanggil $number...'),
+                  content: Text('📞 ${lang.calling} $number...'),
                   backgroundColor: Colors.green,
                 ),
               );
@@ -548,9 +591,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                 color: const Color(0xFF4FC3F7).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Text(
-                'Panggil',
-                style: TextStyle(
+              child: Text(
+                lang.call,
+                style: const TextStyle(
                   fontSize: 9,
                   color: Color(0xFF4FC3F7),
                   fontWeight: FontWeight.w600,
@@ -564,6 +607,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   Widget _buildThresholdRow(String text, bool isAman) {
+    final lang = AppLocalizations.of(context)!;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -580,9 +624,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
             color: const Color(0xFFD1FAE5),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Text(
-            'Aman',
-            style: TextStyle(
+          child: Text(
+            lang.aman,
+            style: const TextStyle(
               color: Color(0xFF22C55E),
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -594,7 +638,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   // ========== EMERGENCY VIEW ==========
-  Widget _buildEmergencyView() {
+  Widget _buildEmergencyView(AppLocalizations lang) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
@@ -691,12 +735,12 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                                 ],
                               ),
                               child: Row(
-                                children: const [
-                                  Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
-                                  SizedBox(width: 8),
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    'DARURAT',
-                                    style: TextStyle(
+                                    lang.emergency,
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
@@ -712,9 +756,9 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    '🆘 Penanganan Darurat',
-                    style: TextStyle(
+                  Text(
+                    '🆘 ${lang.emergencyCondition}',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -722,7 +766,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pilih tindakan yang sesuai dengan kondisi',
+                    lang.spo2Drastis,
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 13,
@@ -731,24 +775,24 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   const SizedBox(height: 24),
                   _buildEmergencyActionCard(
                     icon: Icons.medical_services,
-                    title: 'Buka Inhaler',
-                    desc: 'Panduan langkah demi langkah',
+                    title: lang.bukaInhaler,
+                    desc: lang.stepByStepGuide,
                     color: const Color(0xFF4FC3F7),
                     onTap: () => _goToGuide('inhaler'),
                   ),
                   const SizedBox(height: 12),
                   _buildEmergencyActionCard(
                     icon: Icons.favorite,
-                    title: 'Bantuan Napas (CPR)',
-                    desc: 'Panduan CPR untuk anak',
+                    title: lang.bantuanNapas,
+                    desc: lang.stepByStepGuide,
                     color: const Color(0xFFEF4444),
                     onTap: () => _goToGuide('cpr'),
                   ),
                   const SizedBox(height: 12),
                   _buildEmergencyActionCard(
                     icon: Icons.phone,
-                    title: 'Panggil Bantuan Medis',
-                    desc: 'Hubungi 119 atau ambulans terdekat',
+                    title: lang.panggilBantuan,
+                    desc: lang.call119,
                     color: const Color(0xFFFF6B35),
                     onTap: () {
                       showDialog(
@@ -756,18 +800,18 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                         barrierDismissible: false,
                         builder: (context) => AlertDialog(
                           backgroundColor: const Color(0xFF1A2A3A),
-                          title: const Text(
-                            '📞 Menghubungi...',
-                            style: TextStyle(color: Colors.white),
+                          title: Text(
+                            '📞 ${lang.calling}...',
+                            style: const TextStyle(color: Colors.white),
                           ),
-                          content: const Column(
+                          content: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              CircularProgressIndicator(color: Color(0xFF4FC3F7)),
-                              SizedBox(height: 16),
+                              const CircularProgressIndicator(color: Color(0xFF4FC3F7)),
+                              const SizedBox(height: 16),
                               Text(
-                                'Sedang menghubungi layanan darurat 119',
-                                style: TextStyle(color: Colors.grey),
+                                lang.calling119,
+                                style: const TextStyle(color: Colors.grey),
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -777,8 +821,8 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                       Future.delayed(const Duration(seconds: 3), () {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('📞 Bantuan sedang dalam perjalanan!'),
+                          SnackBar(
+                            content: Text(lang.helpOnTheWay),
                             backgroundColor: Colors.green,
                           ),
                         );
@@ -853,11 +897,14 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
   }
 
   // ========== STEP-BY-STEP GUIDE ==========
-  Widget _buildStepByStepGuide() {
-    final steps = _guideType == 'inhaler' ? _inhalerSteps : _cprSteps;
+  Widget _buildStepByStepGuide(AppLocalizations lang) {
+    final steps = _guideType == 'inhaler' ? _getInhalerSteps() : _getCprSteps();
     final step = steps[_currentStep];
     final color = _guideType == 'inhaler' ? const Color(0xFF4FC3F7) : const Color(0xFFEF4444);
     final icon = _guideType == 'inhaler' ? Icons.medical_services : Icons.favorite;
+    final title = _guideType == 'inhaler'
+        ? '💨 ${lang.bukaInhaler}'
+        : '🫀 ${lang.bantuanNapas}';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A1628),
@@ -888,7 +935,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _guideType == 'inhaler' ? '💨 Cara Pakai Inhaler' : '🫀 Cara Bantuan Napas (CPR)',
+                      title,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -925,7 +972,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
               Row(
                 children: [
                   Text(
-                    'Langkah ${_currentStep + 1} dari ${steps.length}',
+                    '${lang.step} ${_currentStep + 1} ${lang.from} ${steps.length}',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 11,
@@ -990,10 +1037,10 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.white.withOpacity(0.1)),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              '← Sebelumnya',
-                              style: TextStyle(
+                              '← ${lang.previous}',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -1016,7 +1063,7 @@ class _EmergencyMonitorScreenState extends State<EmergencyMonitorScreen>
                         ),
                         child: Center(
                           child: Text(
-                            _currentStep == steps.length - 1 ? '✅ Selesai' : 'Selanjutnya →',
+                            _currentStep == steps.length - 1 ? '✅ ${lang.done}' : '${lang.next} →',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/languages.dart';
 
 class ProfilScreen extends StatefulWidget {
   const ProfilScreen({super.key});
@@ -21,20 +22,17 @@ class _ProfilScreenState extends State<ProfilScreen> {
   List<String> _riwayatKondisi = [];
   final TextEditingController _kondisiController = TextEditingController();
 
-  // 🔥 STATE UNTUK ALERT & SMARTWATCH
   bool _alertSpO2 = true;
   bool _alertHR = true;
   bool _watchConnected = false;
   String _selectedGoldar = 'A+';
   String _connectedDeviceName = '';
 
-  // Daftar Golongan Darah
   final List<String> _goldarOptions = [
     'A+', 'A-', 'B+', 'B-',
     'O+', 'O-', 'AB+', 'AB-'
   ];
 
-  // Daftar perangkat Bluetooth dummy
   final List<Map<String, String>> _bluetoothDevices = [
     {'name': 'Galaxy Watch 4', 'address': 'XX:XX:XX:XX:XX:01'},
     {'name': 'Xiaomi Mi Band 7', 'address': 'XX:XX:XX:XX:XX:02'},
@@ -118,13 +116,43 @@ class _ProfilScreenState extends State<ProfilScreen> {
     });
   }
 
+  void _copyPatientId(String patientId) {
+    final lang = AppLocalizations.of(context)!;
+    if (patientId.isNotEmpty && patientId != 'PED-0000') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.copy, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '✅ ${lang.patientIdCopied}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   void _saveEdit() {
-    // 🔥 VALIDASI
+    final lang = AppLocalizations.of(context)!;
+
     if (!_isValidName(_namaController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nama harus minimal 2 huruf'),
+        SnackBar(
+          content: Text(lang.namaMinimal2),
           backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -132,9 +160,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
     if (!_isNumeric(_usiaController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Usia harus berupa angka'),
+        SnackBar(
+          content: Text(lang.usiaHarusAngka),
           backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -142,9 +171,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
     if (!_isNumeric(_bbController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('BB harus berupa angka'),
+        SnackBar(
+          content: Text(lang.bbHarusAngka),
           backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -152,15 +182,15 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
     if (!_isNumeric(_tbController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('TB harus berupa angka'),
+        SnackBar(
+          content: Text(lang.tbHarusAngka),
           backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    // 🔥 UPDATE KE AUTH
     final auth = context.read<AuthProvider>();
     auth.updateProfile({
       'nama': _namaController.text.trim(),
@@ -175,15 +205,535 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✅ Profil berhasil diperbarui'),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                lang.profilBerhasil,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
   }
 
-  // 🔥 SHOW BLUETOOTH DEVICE PICKER
+  // ========== SMARTWATCH CONNECT POPUP ==========
+  void _showSmartwatchConnectDialog(String deviceName) {
+    final lang = AppLocalizations.of(context)!;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.bluetooth,
+                color: Colors.green,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              lang.connectSmartwatch,
+              style: const TextStyle(
+                color: Color(0xFF1B3A5C),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${lang.connectTo} $deviceName?',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      deviceName,
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              lang.batal,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final auth = context.read<AuthProvider>();
+              auth.connectWatch();
+              auth.updateProfile({'deviceName': deviceName});
+              setState(() {
+                _watchConnected = true;
+                _connectedDeviceName = deviceName;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '✅ $deviceName ${lang.connected}',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'ON',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              lang.connect,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
+  // ========== SMARTWATCH DISCONNECT POPUP ==========
+  void _showSmartwatchDisconnectDialog() {
+    final lang = AppLocalizations.of(context)!;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.bluetooth_disabled,
+                color: Colors.red,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              lang.putuskan,
+              style: const TextStyle(
+                color: Color(0xFF1B3A5C),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              lang.disconnectConfirm,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      lang.disconnectWarning,
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              lang.batal,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final auth = context.read<AuthProvider>();
+              auth.disconnectWatch();
+              auth.updateProfile({'deviceName': ''});
+              setState(() {
+                _watchConnected = false;
+                _connectedDeviceName = '';
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          lang.smartwatchDiputuskan,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'OFF',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.orange,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              lang.putuskan,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
+  // ========== ALERT TOGGLE POPUP ==========
+  void _showAlertToggleDialog(String title, bool currentValue, Function(bool) onChanged) {
+    final lang = AppLocalizations.of(context)!;
+    final newValue = !currentValue;
+    final status = newValue ? 'ON' : 'OFF';
+    final icon = newValue ? Icons.notifications_active : Icons.notifications_off;
+    final color = newValue ? Colors.green : Colors.grey;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Alert $title',
+              style: const TextStyle(
+                color: Color(0xFF1B3A5C),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              newValue
+                  ? lang.enableAlert(title)
+                  : lang.disableAlert(title),
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    newValue ? Icons.check_circle : Icons.cancel,
+                    color: color,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${lang.status}: $status',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              lang.batal,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onChanged(newValue);
+              setState(() {
+                if (title == 'SpO₂') {
+                  _alertSpO2 = newValue;
+                } else {
+                  _alertHR = newValue;
+                }
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(
+                        newValue ? Icons.notifications_active : Icons.notifications_off,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '✅ Alert $title ${newValue ? lang.activated : lang.deactivated}',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          newValue ? 'ON' : 'OFF',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: newValue ? Colors.green : Colors.orange,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              newValue ? lang.activate : lang.deactivate,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
   void _showBluetoothPicker() {
+    final lang = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -207,11 +757,11 @@ class _ProfilScreenState extends State<ProfilScreen> {
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      'Pilih Perangkat Bluetooth',
-                      style: TextStyle(
+                      lang.selectBluetooth,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1B3A5C),
@@ -221,17 +771,17 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   const Divider(color: Color(0xFFF1F5F9), thickness: 1),
                   ListTile(
                     leading: const Icon(Icons.search, color: Color(0xFF4FC3F7)),
-                    title: const Text(
-                      'Cari Perangkat Baru',
-                      style: TextStyle(
+                    title: Text(
+                      lang.findNewDevice,
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1B3A5C),
                       ),
                     ),
-                    subtitle: const Text(
-                      'Scan untuk mencari perangkat terdekat',
-                      style: TextStyle(
+                    subtitle: Text(
+                      lang.scanNearby,
+                      style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF94A3B8),
                       ),
@@ -263,24 +813,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                     onTap: () {
                       Navigator.pop(context);
-
-                      // 🔥 CONNECT KE DEVICE YANG DIPILIH
-                      final auth = context.read<AuthProvider>();
-                      auth.connectWatch();
-                      auth.updateProfile({'deviceName': device['name']});
-
-                      // 🔥 UPDATE STATE
-                      setState(() {
-                        _watchConnected = true;
-                        _connectedDeviceName = device['name']!;
-                      });
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('✅ ${device['name']} berhasil terhubung!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      _showSmartwatchConnectDialog(device['name']!);
                     },
                   )).toList(),
                   const SizedBox(height: 16),
@@ -294,6 +827,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   }
 
   void _showScanningDialog() {
+    final lang = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -307,9 +841,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
           children: [
             const CircularProgressIndicator(color: Color(0xFF4FC3F7)),
             const SizedBox(height: 16),
-            const Text(
-              'Mencari perangkat...',
-              style: TextStyle(
+            Text(
+              lang.searching,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF1B3A5C),
@@ -317,7 +851,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pastikan Bluetooth aktif',
+              lang.ensureBluetooth,
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade500,
@@ -338,7 +872,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text('Batal'),
+                child: Text(lang.batal),
               ),
             ),
           ],
@@ -356,6 +890,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final lang = AppLocalizations.of(context)!;
     final initials = _getInitials(auth.nama);
     final patientId = auth.patientId.isNotEmpty ? auth.patientId : 'PED-0000';
     final deviceName = auth.deviceName.isNotEmpty ? auth.deviceName : 'Galaxy Watch 4';
@@ -366,7 +901,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
       backgroundColor: const Color(0xFFF0F4F8),
       body: Column(
         children: [
-          // ========== HEADER ==========
           Container(
             padding: const EdgeInsets.fromLTRB(16, 48, 16, 40),
             decoration: const BoxDecoration(
@@ -379,11 +913,11 @@ class _ProfilScreenState extends State<ProfilScreen> {
             child: Row(
               children: [
                 const SizedBox(width: 40),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Profil Anak',
+                    lang.profilAnak,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -400,7 +934,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   ),
                   onPressed: () {
                     if (_isEditing) {
-                      // 🔥 BATAL EDIT - RELOAD DATA DARI AUTH
                       _loadDataFromAuth();
                     }
                     setState(() {
@@ -411,8 +944,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
               ],
             ),
           ),
-
-          // ========== AVATAR OVERLAPPING ==========
           Transform.translate(
             offset: const Offset(0, -36),
             child: Column(
@@ -438,7 +969,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isEditing ? _namaController.text : (auth.nama.isNotEmpty ? auth.nama : 'Belum diisi'),
+                  _isEditing ? _namaController.text : (auth.nama.isNotEmpty ? auth.nama : lang.belumDiisi),
                   style: TextStyle(
                     color: auth.nama.isNotEmpty ? const Color(0xFF1B3A5C) : Colors.grey.shade500,
                     fontSize: 16,
@@ -447,41 +978,54 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 ),
                 Text(
                   _isEditing
-                      ? '${_usiaController.text} tahun'
-                      : (auth.usia.isNotEmpty ? '${auth.usia} tahun' : ''),
+                      ? '${_usiaController.text} ${lang.tahun}'
+                      : (auth.usia.isNotEmpty ? '${auth.usia} ${lang.tahun}' : ''),
                   style: TextStyle(
                     color: auth.usia.isNotEmpty ? const Color(0xFF94A3B8) : Colors.grey.shade400,
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isProfileEmpty ? Colors.grey.shade300 : const Color(0xFF1B3A5C),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'KODE UNIK PASIEN  ',
-                        style: TextStyle(
-                          color: isProfileEmpty ? Colors.grey.shade600 : const Color(0xFF4FC3F7),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
+                // UNIQUE PATIENT CODE
+                GestureDetector(
+                  onTap: () => _copyPatientId(patientId),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isProfileEmpty ? Colors.grey.shade300 : const Color(0xFF1B3A5C),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          lang.kodeUnikPasien,
+                          style: TextStyle(
+                            color: isProfileEmpty ? Colors.grey.shade600 : const Color(0xFF4FC3F7),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
                         ),
-                      ),
-                      Text(
-                        isProfileEmpty ? 'BELUM ADA' : patientId,
-                        style: TextStyle(
-                          color: isProfileEmpty ? Colors.grey.shade600 : Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
+                        const SizedBox(width: 6),
+                        Text(
+                          isProfileEmpty ? lang.belumAda : patientId,
+                          style: TextStyle(
+                            color: isProfileEmpty ? Colors.grey.shade600 : Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                    ],
+                        if (!isProfileEmpty) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.copy,
+                            color: Colors.white.withOpacity(0.6),
+                            size: 14,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -505,8 +1049,8 @@ class _ProfilScreenState extends State<ProfilScreen> {
                       const SizedBox(width: 4),
                       Text(
                         isProfileEmpty
-                            ? 'Belum terhubung'
-                            : (auth.watchConnected ? deviceName : 'Tidak terhubung'),
+                            ? lang.belumTerhubung
+                            : (auth.watchConnected ? deviceName : lang.tidakTerhubung),
                         style: TextStyle(
                           color: isProfileEmpty ? Colors.grey.shade500 : const Color(0xFF4FC3F7),
                           fontSize: 10,
@@ -519,8 +1063,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
               ],
             ),
           ),
-
-          // ========== BODY CARD ==========
           Expanded(
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -546,7 +1088,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Profil masih kosong',
+                              lang.profilKosong,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -555,7 +1097,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Klik ikon edit di atas untuk mengisi data diri',
+                              lang.klikEdit,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade400,
@@ -565,15 +1107,14 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         ),
                       ),
                     ] else if (_isEditing) ...[
-                      // ========== EDIT MODE ==========
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'DATA DIRI',
-                              style: TextStyle(
+                            Text(
+                              lang.dataDiri.toUpperCase(),
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF94A3B8),
@@ -581,53 +1122,52 @@ class _ProfilScreenState extends State<ProfilScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildEditField('Nama Lengkap', _namaController),
+                            _buildEditField(lang.namaLengkap, _namaController),
                             const SizedBox(height: 4),
                             Text(
-                              'Minimal 2 huruf',
+                              lang.minimal2Huruf,
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey.shade400,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildEditField('Usia (tahun)', _usiaController),
+                            _buildEditField('${lang.usia} (${lang.tahun})', _usiaController),
                             const SizedBox(height: 4),
                             Text(
-                              'Hanya angka',
+                              lang.hanyaAngka,
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey.shade400,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildEditField('BB (kg)', _bbController),
+                            _buildEditField('${lang.bb} (kg)', _bbController),
                             const SizedBox(height: 4),
                             Text(
-                              'Hanya angka',
+                              lang.hanyaAngka,
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey.shade400,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildEditField('TB (cm)', _tbController),
+                            _buildEditField('${lang.tb} (cm)', _tbController),
                             const SizedBox(height: 4),
                             Text(
-                              'Hanya angka',
+                              lang.hanyaAngka,
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey.shade400,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            // Gol. Darah Dropdown
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Gol. Darah',
-                                  style: TextStyle(
+                                Text(
+                                  lang.goldar,
+                                  style: const TextStyle(
                                     color: Colors.grey,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -666,11 +1206,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             const SizedBox(height: 16),
                             const Divider(color: Color(0xFFF1F5F9)),
                             const SizedBox(height: 16),
-
-                            // Riwayat Kondisi
-                            const Text(
-                              'RIWAYAT KONDISI',
-                              style: TextStyle(
+                            Text(
+                              lang.riwayatKondisi.toUpperCase(),
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF94A3B8),
@@ -685,7 +1223,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                     controller: _kondisiController,
                                     style: const TextStyle(color: Color(0xFF1B3A5C), fontSize: 14),
                                     decoration: InputDecoration(
-                                      hintText: 'Tambah kondisi...',
+                                      hintText: lang.tambahKondisi,
                                       hintStyle: TextStyle(color: Colors.grey.shade400),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(10),
@@ -762,10 +1300,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                               }).toList(),
                             ),
                             if (_riwayatKondisi.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
                                 child: Text(
-                                  'Belum ada riwayat kondisi',
+                                  lang.belumAdaKondisi,
                                   style: TextStyle(
                                     color: Color(0xFF94A3B8),
                                     fontSize: 12,
@@ -774,7 +1312,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                 ),
                               ),
                             const SizedBox(height: 16),
-
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
@@ -786,9 +1323,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: const Text(
-                                  '💾 Simpan Perubahan',
-                                  style: TextStyle(
+                                child: Text(
+                                  lang.simpanPerubahan,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -800,34 +1337,32 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         ),
                       ),
                     ] else ...[
-                      // ========== VIEW MODE ==========
-                      _buildSectionHeader('Data Diri'),
+                      _buildSectionHeader(lang.dataDiri, lang),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
                             _buildDataItem(
-                              value: auth.usia.isNotEmpty ? '${auth.usia} thn' : '-',
-                              label: 'Usia',
+                              value: auth.usia.isNotEmpty ? '${auth.usia} ${lang.tahun}' : '-',
+                              label: lang.usia,
                             ),
                             _buildDataItem(
                               value: auth.bb.isNotEmpty ? '${auth.bb} kg' : '-',
-                              label: 'BB',
+                              label: lang.bb,
                             ),
                             _buildDataItem(
                               value: auth.tb.isNotEmpty ? '${auth.tb} cm' : '-',
-                              label: 'TB',
+                              label: lang.tb,
                             ),
                             _buildDataItem(
                               value: auth.goldar.isNotEmpty ? auth.goldar : '-',
-                              label: 'Gol. Darah',
+                              label: lang.goldar,
                             ),
                           ],
                         ),
                       ),
                       const Divider(color: Color(0xFFF1F5F9), thickness: 1, height: 1),
-
-                      _buildSectionHeader('Riwayat Kondisi'),
+                      _buildSectionHeader(lang.riwayatKondisi, lang),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Wrap(
@@ -838,7 +1373,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                             String label = entry.value;
                             final data = _bubbleData[index % _bubbleData.length];
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: data['bg'],
                                 borderRadius: BorderRadius.circular(20),
@@ -859,10 +1394,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         ),
                       ),
                       if (_riwayatKondisi.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: Text(
-                            'Belum ada riwayat kondisi',
+                            lang.belumAdaKondisi,
                             style: TextStyle(
                               color: Color(0xFF94A3B8),
                               fontSize: 12,
@@ -871,33 +1406,29 @@ class _ProfilScreenState extends State<ProfilScreen> {
                           ),
                         ),
                       const Divider(color: Color(0xFFF1F5F9), thickness: 1, height: 1),
-
-                      // ========== PENGATURAN ALERT (LANGSUNG ON/OFF) ==========
-                      _buildSectionHeader('Pengaturan Alert'),
+                      _buildSectionHeader(lang.pengaturanAlert, lang),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Column(
                           children: [
                             _buildAlertToggle(
                               title: 'Alert SpO₂',
-                              subtitle: 'Notif jika SpO₂ < 94%',
+                              subtitle: '${lang.notifJika} SpO₂ < 94%',
                               value: auth.alertSpO2,
                               onChanged: (value) {
-                                context.read<AuthProvider>().updateProfile({'alertSpO2': value});
-                                setState(() {
-                                  _alertSpO2 = value;
+                                _showAlertToggleDialog('SpO₂', auth.alertSpO2, (newValue) {
+                                  context.read<AuthProvider>().updateProfile({'alertSpO2': newValue});
                                 });
                               },
                             ),
                             const SizedBox(height: 4),
                             _buildAlertToggle(
-                              title: 'Alert Detak Jantung',
-                              subtitle: 'Notif jika HR > 140 bpm',
+                              title: 'Alert ${lang.heartRate}',
+                              subtitle: '${lang.notifJika} HR > 140 bpm',
                               value: auth.alertHR,
                               onChanged: (value) {
-                                context.read<AuthProvider>().updateProfile({'alertHR': value});
-                                setState(() {
-                                  _alertHR = value;
+                                _showAlertToggleDialog('HR', auth.alertHR, (newValue) {
+                                  context.read<AuthProvider>().updateProfile({'alertHR': newValue});
                                 });
                               },
                             ),
@@ -905,9 +1436,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         ),
                       ),
                       const Divider(color: Color(0xFFF1F5F9), thickness: 1, height: 1),
-
-                      // ========== SMARTWATCH (LANGSUNG CONNECT/DISCONNECT) ==========
-                      _buildSectionHeader('Smartwatch'),
+                      _buildSectionHeader(lang.smartwatch, lang),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Container(
@@ -936,7 +1465,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      auth.watchConnected ? deviceName : 'Tidak ada perangkat terhubung',
+                                      auth.watchConnected ? deviceName : lang.tidakAdaPerangkat,
                                       style: TextStyle(
                                         color: auth.watchConnected ? const Color(0xFF1B3A5C) : Colors.grey,
                                         fontWeight: FontWeight.w600,
@@ -945,7 +1474,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                     ),
                                     if (auth.watchConnected)
                                       Text(
-                                        'Baterai ${auth.watchBattery}',
+                                        '${lang.baterai} ${auth.watchBattery}',
                                         style: const TextStyle(
                                           color: Colors.grey,
                                           fontSize: 13,
@@ -953,7 +1482,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                       ),
                                     if (!auth.watchConnected)
                                       Text(
-                                        'Klik tombol di bawah untuk mencari perangkat',
+                                        lang.klikHubungkan,
                                         style: TextStyle(
                                           color: Colors.grey.shade500,
                                           fontSize: 12,
@@ -964,21 +1493,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                               ),
                               if (auth.watchConnected)
                                 GestureDetector(
-                                  onTap: () {
-                                    final auth = context.read<AuthProvider>();
-                                    auth.disconnectWatch();
-                                    auth.updateProfile({'deviceName': ''});
-                                    setState(() {
-                                      _watchConnected = false;
-                                      _connectedDeviceName = '';
-                                    });
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('❌ Smartwatch diputuskan'),
-                                        backgroundColor: Colors.orange,
-                                      ),
-                                    );
-                                  },
+                                  onTap: _showSmartwatchDisconnectDialog,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
@@ -986,9 +1501,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: Colors.red.withOpacity(0.2)),
                                     ),
-                                    child: const Text(
-                                      'Putuskan',
-                                      style: TextStyle(
+                                    child: Text(
+                                      lang.putuskan,
+                                      style: const TextStyle(
                                         color: Colors.red,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -1005,9 +1520,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                       color: const Color(0xFF1B3A5C),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
-                                    child: const Text(
-                                      'Hubungkan',
-                                      style: TextStyle(
+                                    child: Text(
+                                      lang.hubungkan,
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -1030,7 +1545,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String label) {
+  Widget _buildSectionHeader(String label, AppLocalizations lang) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
