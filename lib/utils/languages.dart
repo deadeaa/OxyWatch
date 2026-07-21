@@ -182,6 +182,68 @@ class AppLocalizations {
   String get passwordMin6 => isId ? 'Password minimal 6 karakter' : 'Password must be at least 6 characters';
   String get forgotPasswordComingSoon => isId ? 'Fitur lupa kata sandi segera hadir' : 'Forgot password feature coming soon';
 
+  // ========== DOCTOR ==========
+  String get doctor => isId ? 'Dokter' : 'Doctor';
+
+  // ========== DOCTOR PROFILE ==========
+  String get licenseNumber => isId ? 'No. SIP' : 'License No.';
+  String get institution => isId ? 'Institusi' : 'Institution';
+  String get specialization => isId ? 'Spesialisasi' : 'Specialization';
+  String get validUntil => isId ? 'Aktif hingga' : 'Valid until';
+
+  // ========== DOCTOR CHAT ==========
+  String get noMessageYet => isId ? 'Belum ada pesan' : 'No message yet';
+  String get tapToStartChat => isId ? 'Ketuk untuk mulai chat' : 'Tap to start chat';
+  String get noConversation => isId ? 'Belum ada percakapan' : 'No conversations yet';
+  String get startChatFromPatients => isId ? 'Mulai chat dari halaman daftar pasien.' : 'Start chat from patient list page.';
+  String get sendMessageToParent => isId ? 'Kirim pesan ke orang tua...' : 'Send message to parent...';
+
+  // ========== DOCTOR DASHBOARD ==========
+  String get searchPatient => isId ? 'Cari pasien...' : 'Search patient...';
+  String get needImmediateAttention => isId ? '⚠ PERLU PERHATIAN SEGERA' : '⚠ NEED IMMEDIATE ATTENTION';
+  String get allPatients => isId ? 'SEMUA PASIEN' : 'ALL PATIENTS';
+  String get unreadChats => isId ? 'BELUM DIBACA / DIBALAS' : 'UNREAD / UNREPLIED';
+  String get readChats => isId ? 'SUDAH DIBACA' : 'READ';
+  String get noChats => isId ? 'Belum ada percakapan' : 'No conversations yet';
+  String get logoutConfirm => isId ? 'Apakah kamu yakin ingin logout?' : 'Are you sure you want to logout?';
+  String get logout => isId ? 'Keluar' : 'Logout';
+  String get cancel => isId ? 'Batal' : 'Cancel';
+
+  // ========== DOCTOR DASHBOARD STATS ==========
+  String get avgSpO2 => isId ? 'Rata-rata SpO₂ Pasien' : 'Avg SpO₂ Patients';
+  String get needAttention => isId ? 'Pasien Perlu Perhatian' : 'Patients Need Attention';
+  String get consultationsToday => isId ? 'Konsultasi Hari Ini' : 'Today\'s Consultations';
+  String get activeAlerts => isId ? 'Alert Aktif' : 'Active Alerts';
+
+  // ========== DOCTOR DASHBOARD TIPS ==========
+  String get globalHealthUpdate => isId ? 'UPDATE KESEHATAN GLOBAL' : 'GLOBAL HEALTH UPDATE';
+  String get clinicalTips => isId ? 'TIPS KLINIS HARI INI' : 'TODAY\'S CLINICAL TIPS';
+  String get seasonWarning => isId ? 'PERINGATAN MUSIM' : 'SEASON WARNING';
+  String get seasonWarningDesc => isId
+      ? 'Musim kemarau — risiko ISPA meningkat. Pasien asma perlu pemantauan SpO₂ lebih sering.'
+      : 'Dry season — risk of respiratory infections increases. Asthma patients need more frequent SpO₂ monitoring.';
+
+  // ========== DOCTOR PROFILE ==========
+  String get licenseSIP => isId ? 'LISENSI & SIP' : 'LICENSE & SIP';
+  String get settings => isId ? 'PENGATURAN' : 'SETTINGS';
+  String get language => isId ? 'Bahasa / Language' : 'Language';
+  String get changeLanguage => isId ? 'Ubah bahasa dashboard' : 'Change dashboard language';
+  String get patientAlerts => isId ? 'Notifikasi alert pasien' : 'Patient alert notifications';
+  String get alertNotifications => isId ? 'Pengaturan notifikasi' : 'Notification settings';
+  String get accountSecurity => isId ? 'Keamanan akun' : 'Account security';
+  String get securitySettings => isId ? 'Pengaturan keamanan' : 'Security settings';
+
+  // ========== DOCTOR NOTIFICATIONS ==========
+  String get notifications => isId ? 'NOTIFIKASI PASIEN' : 'PATIENT NOTIFICATIONS';
+  String get markAllRead => isId ? 'Tandai Semua' : 'Mark All Read';
+  String get noNotifications => isId ? 'Tidak ada notifikasi' : 'No notifications';
+  String get allNotificationsRead => isId ? '✅ Semua notifikasi ditandai telah dibaca' : '✅ All notifications marked as read';
+
+  // ========== DOCTOR BOTTOM NAV ==========
+  String get patients => isId ? 'Pasien' : 'Patients';
+  String get chat => isId ? 'Chat' : 'Chat';
+  String get profile => isId ? 'Profil' : 'Profile';
+
   // ========== DOCTOR LOGIN ==========
   String get doctorLogin => isId ? 'Login Dokter' : 'Doctor Login';
   String get doctorLoginSubtitle => isId ? 'Press Healthcare — OxyWatch Clinic' : 'Press Healthcare — OxyWatch Clinic';

@@ -6,19 +6,19 @@ import '../providers/auth_provider.dart';
 import '../services/chat_service.dart';
 import '../models/chat_message_model.dart';
 import '../models/user_model.dart';
-
+// screens/chat_detail_screen.dart
 class ChatDetailScreen extends StatefulWidget {
   final String conversationId;
-  // Nama & subtitle lawan bicara. Kalau aku dokter yang buka, ini nama
-  // ORANG TUA + nama anaknya. Kalau aku parent yang buka, ini nama DOKTER.
   final String otherPersonName;
   final String otherPersonSubtitle;
+  final VoidCallback? onBack;
 
   const ChatDetailScreen({
     super.key,
     required this.conversationId,
     required this.otherPersonName,
     this.otherPersonSubtitle = '',
+    this.onBack,
   });
 
   @override
@@ -33,7 +33,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Begitu layar dibuka, tandai semua pesan masuk sebagai sudah dibaca.
+    // Gunakan widget.conversationId, bukan variabel lokal
     _chatService.markConversationAsRead(widget.conversationId);
   }
 
@@ -79,7 +79,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (widget.onBack != null) {
+              widget.onBack!();
+            }
+            Navigator.pop(context);
+          },
         ),
         title: Row(
           children: [
