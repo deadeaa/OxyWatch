@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/languages.dart';
 import '../config/app_colors.dart';
+import '../services/code_generator_service.dart';
 
 class OnboardingProfileScreen extends StatefulWidget {
   const OnboardingProfileScreen({super.key});
@@ -39,6 +40,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CodeGeneratorService _codeGeneratorService = CodeGeneratorService();
 
   final List<String> _goldarOptions = [
     'A+', 'A-', 'B+', 'B-',
@@ -151,7 +153,12 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         throw Exception('User not logged in');
       }
 
-      final String patientId = 'PED-${DateTime.now().millisecondsSinceEpoch.toString().substring(7, 12)}';
+      // 🔥 FIX: patientId sebelumnya dibuat dari potongan timestamp
+      // (DateTime.now().millisecondsSinceEpoch...) yang TIDAK dijamin unik
+      // secara global (berpotensi bentrok kalau ada 2 submit hampir
+      // bersamaan). Sekarang pakai CodeGeneratorService yang atomik via
+      // Firestore transaction, konsisten dengan cara userCode dibuat.
+      final String patientId = await _codeGeneratorService.generatePatientCode();
 
       final profileData = {
         'uid': user.uid,
@@ -177,6 +184,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         SetOptions(merge: true),
       );
 
+      if (!mounted) return;
       final authProvider = context.read<AuthProvider>();
       authProvider.setProfile(
         nama: _namaController.text.trim(),
@@ -201,22 +209,26 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         Navigator.pushReplacementNamed(context, '/main');
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ ${lang.profilBerhasil}'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ ${lang.profilBerhasil}'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Gagal menyimpan profil: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Gagal menyimpan profil: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -234,6 +246,12 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         throw Exception('User not logged in');
       }
 
+      // 🔥 FIX: sebelumnya di sini patientId di-HARDCODE 'PED-0000' untuk
+      // SEMUA orang yang skip onboarding. Itu penyebab semua pasien yang
+      // di-skip tampil dengan kode identik di dashboard dokter. Sekarang
+      // tetap di-generate unik walau user memilih skip.
+      final String patientId = await _codeGeneratorService.generatePatientCode();
+
       final authProvider = context.read<AuthProvider>();
 
       final profileData = {
@@ -246,7 +264,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         'riwayat': [],
         'alertSpO2': true,
         'alertHR': true,
-        'patientId': 'PED-0000',
+        'patientId': patientId,
         'deviceName': '',
         'watchConnected': false,
         'watchBattery': '0%',
@@ -269,7 +287,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         riwayat: [],
         alertSpO2: true,
         alertHR: true,
-        patientId: 'PED-0000',
+        patientId: patientId,
       );
       authProvider.setProfileCompleted(true);
 
@@ -278,13 +296,15 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
       }
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Gagal skip: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Gagal skip: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -379,7 +399,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                         deviceName: device['name']!,
                       );
                     },
-                  )).toList(),
+                  )),
                   const SizedBox(height: 16),
                 ],
               );
@@ -456,7 +476,6 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     final lang = AppLocalizations.of(context)!;
     final languageProvider = context.watch<LanguageProvider>();
     final currentLang = languageProvider.currentLanguage;
-    final authProvider = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -469,7 +488,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -560,14 +579,13 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.6),
+            color: isSelected ? AppColors.primary : Colors.white.withValues(alpha: 0.6),
           ),
         ),
       ),
     );
   }
 
-  // ... (rest of the code remains the same as previous)
   Widget _buildStepIndicator(int index, String label) {
     bool isActive = _currentStep == index;
     bool isDone = _currentStep > index;
@@ -875,14 +893,14 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                 int index = entry.key;
                 String kondisi = entry.value;
                 final colors = [
-                  Color(0xFFD97706), Color(0xFF0EA5E9),
-                  Color(0xFFEF4444), Color(0xFF8B5CF6),
-                  Color(0xFFEC4899), Color(0xFF14B8A6)
+                  const Color(0xFFD97706), const Color(0xFF0EA5E9),
+                  const Color(0xFFEF4444), const Color(0xFF8B5CF6),
+                  const Color(0xFFEC4899), const Color(0xFF14B8A6)
                 ];
                 final color = colors[index % colors.length];
                 return Chip(
                   label: Text(kondisi, style: TextStyle(fontSize: 13, color: color)),
-                  backgroundColor: color.withOpacity(0.1),
+                  backgroundColor: color.withValues(alpha: 0.1),
                   deleteIcon: const Icon(Icons.close, size: 16, color: Colors.grey),
                   onDeleted: () => _removeKondisi(index),
                 );
@@ -1042,9 +1060,9 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.05),
+                    color: Colors.blue.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.withOpacity(0.1)),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     children: [
@@ -1084,9 +1102,9 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.05),
+                    color: Colors.orange.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.1)),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     children: [
@@ -1108,9 +1126,9 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.05),
+                    color: Colors.green.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withOpacity(0.1)),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     children: [

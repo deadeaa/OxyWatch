@@ -1,7 +1,6 @@
 // screens/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/monitoring_provider.dart';
 import '../providers/notifikasi_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/patient_card.dart';
@@ -10,10 +9,48 @@ import '../widgets/trend_chart.dart';
 import '../screens/emergency_monitor_screen.dart';
 import '../screens/notifikasi_screen.dart';
 import '../screens/pengaturan_screen.dart';
+import '../screens/login_screen.dart';
 import '../utils/languages.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Apakah kamu yakin ingin logout?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Batal"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "Logout",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    if (!context.mounted) return;
+
+    // Pakai AuthProvider (bukan AuthService langsung) supaya semua state
+    // (isLoggedIn, currentUser, data profil anak, dst) ikut ter-reset.
+    await context.read<AuthProvider>().logout();
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +124,12 @@ class DashboardScreen extends StatelessWidget {
               );
             },
           ),
+          // 🔥 TOMBOL LOGOUT (baru ditambahkan)
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Logout",
+            onPressed: () => _handleLogout(context),
+          ),
         ],
       ),
       body: SafeArea(
@@ -95,7 +138,7 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              PatientCard(),
+              const PatientCard(),
               const SizedBox(height: 16),
 
               // Vital Signs Row
@@ -206,7 +249,7 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -254,9 +297,9 @@ class DashboardScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withOpacity(0.2)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                 ),
                 child: Text(
                   status,
@@ -282,7 +325,7 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

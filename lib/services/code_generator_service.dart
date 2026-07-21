@@ -43,4 +43,31 @@ class CodeGeneratorService {
       return '$prefix$formattedNumber';
     });
   }
+
+  // 🔥 BARU: generator kode unik untuk pasien (anak), format PED-0001, dst.
+  // Pakai pola yang SAMA dengan generateUserCode() di atas (Firestore
+  // transaction) supaya dijamin atomik/tidak bentrok walau ada beberapa
+  // parent yang submit profil di waktu yang nyaris bersamaan.
+  Future<String> generatePatientCode() async {
+    final counterRef = _firestore.collection('counters').doc('patient_counter');
+
+    return await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(counterRef);
+
+      int lastNumber = 0;
+      if (snapshot.exists) {
+        lastNumber = (snapshot.data()?['lastNumber'] ?? 0) as int;
+      }
+
+      final nextNumber = lastNumber + 1;
+      transaction.set(
+        counterRef,
+        {'lastNumber': nextNumber},
+        SetOptions(merge: true),
+      );
+
+      final formattedNumber = nextNumber.toString().padLeft(4, '0');
+      return 'PED-$formattedNumber';
+    });
+  }
 }

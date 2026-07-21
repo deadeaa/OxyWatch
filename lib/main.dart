@@ -9,6 +9,7 @@ import 'providers/auth_provider.dart';
 import 'providers/notifikasi_provider.dart';
 import 'providers/monitoring_provider.dart';
 import 'providers/language_provider.dart';
+import 'models/user_model.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/chat_list_screen.dart';
 import 'screens/riwayat_screen.dart';
@@ -23,6 +24,7 @@ import 'screens/register_screen.dart';
 import 'utils/languages.dart';
 import 'screens/role_selection_screen.dart';
 import 'screens/doctor_login_screen.dart';
+import 'services/chat_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,7 +107,13 @@ class MyApp extends StatelessWidget {
               onNext: () {
                 final authProvider = context.read<AuthProvider>();
                 if (authProvider.isLoggedIn) {
-                  if (authProvider.isProfileCompleted) {
+                  final isDoctor = authProvider.currentUser?.role == UserRole.doctor;
+                  if (isDoctor) {
+                    // Dokter selalu langsung ke dashboard dokter,
+                    // tidak lewat pengecekan isProfileCompleted
+                    // (field itu cuma relevan untuk profil anak di sisi parent).
+                    Navigator.pushReplacementNamed(context, '/doctor');
+                  } else if (authProvider.isProfileCompleted) {
                     Navigator.pushReplacementNamed(context, '/main');
                   } else {
                     Navigator.pushReplacementNamed(context, '/onboarding');
@@ -180,8 +188,8 @@ class _MainScreenState extends State<MainScreen> {
             label: lang.bottomDashboard,
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.chat_outlined),
-            activeIcon: const Icon(Icons.chat),
+            icon: _buildChatIconWithBadge(const Icon(Icons.chat_outlined)),
+            activeIcon: _buildChatIconWithBadge(const Icon(Icons.chat)),
             label: lang.bottomChat,
           ),
           BottomNavigationBarItem(
@@ -196,6 +204,40 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // 🔥 BARU: badge angka merah di icon Chat kalau ada pesan belum dibaca.
+  Widget _buildChatIconWithBadge(Widget icon) {
+    return StreamBuilder<int>(
+      stream: ChatService().streamTotalUnreadCount(),
+      builder: (context, snapshot) {
+        final unread = snapshot.data ?? 0;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            icon,
+            if (unread > 0)
+              Positioned(
+                right: -6,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                  child: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

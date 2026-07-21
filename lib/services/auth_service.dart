@@ -27,9 +27,18 @@ class AuthService {
     try {
       debugPrint("========== REGISTER START ==========");
 
-      final credential = await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth
+          .createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
+      )
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw FirebaseAuthException(
+          code: 'network-timeout',
+          message:
+          'Koneksi ke server timeout. Cek koneksi internet / jaringan kamu.',
+        ),
       );
 
       final firebaseUser = credential.user;
@@ -58,7 +67,15 @@ class AuthService {
       await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
-          .set(user.toMap());
+          .set(user.toMap())
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw FirebaseAuthException(
+          code: 'network-timeout',
+          message:
+          'Akun berhasil dibuat, tapi gagal simpan data ke server. Cek koneksi internet dan coba login manual.',
+        ),
+      );
       debugPrint("STEP 5 ✓ Firestore Saved");
 
       debugPrint("========== REGISTER SUCCESS ==========");
@@ -86,9 +103,18 @@ class AuthService {
     try {
       debugPrint("========== LOGIN START ==========");
 
-      final credential = await _auth.signInWithEmailAndPassword(
+      final credential = await _auth
+          .signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
+      )
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw FirebaseAuthException(
+          code: 'network-timeout',
+          message:
+          'Koneksi ke server timeout. Cek koneksi internet / jaringan kamu.',
+        ),
       );
 
       final firebaseUser = credential.user;
@@ -101,7 +127,15 @@ class AuthService {
       final snapshot = await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
-          .get();
+          .get()
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw FirebaseAuthException(
+          code: 'network-timeout',
+          message:
+          'Login berhasil, tapi gagal ambil data profil. Cek koneksi internet dan coba lagi.',
+        ),
+      );
 
       if (!snapshot.exists) {
         return AuthResult.failure("User data not found.");
@@ -109,6 +143,16 @@ class AuthService {
 
       final user = UserModel.fromMap(snapshot.data()!);
       debugPrint("STEP 2 ✓ Firestore Loaded: ${user.fullName}");
+
+      // 🔥 BARU: tandai user ini online. Catatan jujur: ini BUKAN presence
+      // real-time yang akurat (kalau app di-force-close/koneksi putus
+      // mendadak, status ini akan nyangkut 'true'). Presence yang benar
+      // butuh Firebase Realtime Database (onDisconnect()), di luar scope
+      // sekarang. Ini cukup untuk kebutuhan "dokter lagi aktif atau tidak"
+      // secara kasar.
+      await _firestore.collection('users').doc(firebaseUser.uid).update({
+        'isOnline': true,
+      });
 
       debugPrint("========== LOGIN SUCCESS ==========");
 
@@ -129,6 +173,18 @@ class AuthService {
   // ==========================
 
   Future<void> logout() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await _firestore.collection('users').doc(uid).update({
+          'isOnline': false,
+        });
+      } catch (e) {
+        // Kalau update ini gagal (misal jaringan putus pas logout), jangan
+        // sampai gagal logout-nya juga. Logout tetap harus jalan.
+        debugPrint("Gagal set isOnline=false: $e");
+      }
+    }
     await _auth.signOut();
     debugPrint("Logout Success");
   }
@@ -216,6 +272,8 @@ class AuthService {
         return 'Password salah.';
       case 'too-many-requests':
         return 'Terlalu banyak percobaan. Coba lagi nanti.';
+      case 'network-timeout':
+        return e.message ?? 'Koneksi timeout. Cek jaringan internet kamu.';
       default:
         return e.message ?? 'Terjadi kesalahan.';
     }

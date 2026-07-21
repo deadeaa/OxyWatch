@@ -4,9 +4,7 @@ import '../config/app_colors.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
-import '../utils/languages.dart';
 import '../widgets/oxywatch_logo.dart';
-import '../screens/role_selection_screen.dart';
 import '../screens/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -28,6 +26,20 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // 🔥 FIX: cek dulu apakah masih ada halaman untuk di-pop.
+  // Setelah logout, stack navigasi dikosongkan total (pushAndRemoveUntil
+  // dengan predicate `(route) => false`), jadi LoginScreen jadi satu-satunya
+  // halaman di stack. Kalau langsung Navigator.pop(context) tanpa cek,
+  // hasilnya stack jadi benar-benar kosong -> layar hitam.
+  // Solusinya: kalau tidak bisa pop, arahkan eksplisit ke role-selection.
+  void _handleBack(BuildContext context) {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacementNamed(context, '/role-selection');
+    }
   }
 
   Future<void> _login() async {
@@ -121,12 +133,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     left: 0,
                     top: 0,
                     child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => _handleBack(context),
                       child: Container(
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
@@ -144,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -170,9 +182,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        const Text(
                           'OxyWatch',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Color(0xFFA9B7CC),
                             fontSize: 12,
                           ),
@@ -454,7 +466,7 @@ class _LoginScreenState extends State<LoginScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.6),
+            color: isSelected ? AppColors.primary : Colors.white.withValues(alpha: 0.6),
           ),
         ),
       ),
