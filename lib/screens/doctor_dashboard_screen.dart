@@ -1,4 +1,4 @@
-// screens/doctor/doctor_dashboard_screen.dart - FULL CODE YANG DIPERBAIKI
+// screens/doctor/doctor_dashboard_screen.dart - FULL CODE
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -136,23 +136,19 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
 
   // ==========================
-  // 🔥 HELPER AMAN untuk ambil unreadCount dari Map
+  // HELPER AMAN untuk ambil unreadCount dari Map
   // ==========================
   int _getUnreadCountSafe(Map<String, dynamic>? data, String myUid) {
     if (data == null) return 0;
 
-    // Coba ambil unreadCount
     final unreadCount = data['unreadCount'];
     if (unreadCount == null) return 0;
 
-    // Jika unreadCount adalah Map (per user)
     if (unreadCount is Map) {
-      // Coba ambil untuk user ini
       final value = unreadCount[myUid];
       if (value is int) return value;
       if (value is String) return int.tryParse(value) ?? 0;
       if (value is num) return value.toInt();
-      // Jika tidak ada untuk user ini, coba jumlahkan semua
       int total = 0;
       for (final v in unreadCount.values) {
         if (v is int) total += v;
@@ -162,7 +158,6 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       return total;
     }
 
-    // Jika unreadCount adalah angka langsung
     if (unreadCount is int) return unreadCount;
     if (unreadCount is String) return int.tryParse(unreadCount) ?? 0;
     if (unreadCount is num) return unreadCount.toInt();
@@ -170,26 +165,11 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     return 0;
   }
 
-  // ==========================
-  // HELPER AMAN untuk ambil lastMessage
-  // ==========================
   String _getLastMessageSafe(Map<String, dynamic>? data) {
     if (data == null) return '';
     final message = data['lastMessage'];
     if (message == null) return '';
     return message.toString();
-  }
-
-  // ==========================
-  // HELPER AMAN untuk ambil lastMessageTime
-  // ==========================
-  DateTime? _getLastMessageTimeSafe(Map<String, dynamic>? data) {
-    if (data == null) return null;
-    final time = data['lastMessageAt'];
-    if (time == null) return null;
-    if (time is Timestamp) return time.toDate();
-    if (time is DateTime) return time;
-    return null;
   }
 
   @override
@@ -383,9 +363,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                 final data = doc.data() as Map<String, dynamic>;
                 final parentId = data['parentId'] as String?;
                 if (parentId != null) {
-                  // 🔥 Gunakan helper aman
                   final unreadCount = _getUnreadCountSafe(data, myUid);
-
                   conversationMap[parentId] = {
                     'conversationId': doc.id,
                     'unreadCount': unreadCount,
@@ -529,11 +507,9 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     final status = _statusFromVitals(data['spo2'], data['heartRate']);
     final initials = _getInitials(nama.toString());
 
-    // 🔥 Ambil dari conversation dengan aman - PERBAIKI CAST
     int unreadCount = 0;
     String lastMessage = '';
     if (conversation != null) {
-      // Gunakan helper aman
       final rawUnread = conversation['unreadCount'];
       if (rawUnread is int) {
         unreadCount = rawUnread;
@@ -873,7 +849,6 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       final parentId = data['parentId'] as String?;
       if (parentId == null) continue;
 
-      // 🔥 Gunakan helper aman
       final unreadCount = _getUnreadCountSafe(data, myUid);
 
       try {
@@ -883,16 +858,20 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
             .get();
 
         final userData = userDoc.data() as Map<String, dynamic>? ?? {};
-        final nama = userData['nama'] ?? 'Pasien';
+
+        // 🔥 Gunakan 'nama' dari profil (data anak), bukan 'fullName' (nama akun)
+        final namaAnak = userData['nama'] ?? 'Pasien';
         final patientId = userData['patientId'] ?? '-';
+        final namaOrangTua = userData['fullName'] ?? '-';
         final lastMessage = _getLastMessageSafe(data);
         final lastMessageAt = data['lastMessageAt'];
 
         items.add({
           'conversationId': doc.id,
           'parentId': parentId,
-          'nama': nama,
+          'nama': namaAnak,
           'patientId': patientId,
+          'namaOrangTua': namaOrangTua,
           'lastMessage': lastMessage,
           'lastMessageAt': lastMessageAt,
           'unreadCount': unreadCount,
@@ -919,12 +898,13 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       Map<String, dynamic> item,
       {required bool isUnread}
       ) {
-    final nama = item['nama'] ?? 'Pasien';
+    final namaAnak = item['nama'] ?? 'Pasien';
+    final namaOrangTua = item['namaOrangTua'] ?? '-';
     final patientId = item['patientId'] ?? '-';
     final unreadCount = (item['unreadCount'] as int?) ?? 0;
     final lastMessage = item['lastMessage'] ?? '';
     final hasMessage = lastMessage.isNotEmpty;
-    final initials = _getInitials(nama.toString());
+    final initials = _getInitials(namaAnak.toString());
 
     String timeString = '';
     final lastMessageAt = item['lastMessageAt'];
@@ -966,7 +946,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           ),
         ),
         title: Text(
-          nama,
+          namaAnak,
           style: TextStyle(
             fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
             fontSize: 13,
@@ -977,7 +957,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$patientId',
+              'Orang tua: $namaOrangTua · $patientId',
               style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
             ),
             Text(
@@ -1004,16 +984,16 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
             const SizedBox(height: 4),
             if (isUnread && unreadCount > 0)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: const BoxDecoration(
                   color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
                 ),
                 child: Text(
                   unreadCount > 9 ? '9+' : '$unreadCount',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1033,8 +1013,8 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
             MaterialPageRoute(
               builder: (_) => ChatDetailScreen(
                 conversationId: conversationId,
-                otherPersonName: nama.toString(),
-                otherPersonSubtitle: 'Orang tua: ${item['parentId']}',
+                otherPersonName: namaAnak.toString(),
+                otherPersonSubtitle: 'Orang tua: $namaOrangTua',
                 onBack: () {
                   setState(() {});
                 },
@@ -1751,7 +1731,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
 
   // ==========================
-  // BOTTOM NAV
+  // BOTTOM NAV - dengan badge yang tidak kepotong
   // ==========================
   Widget _buildBottomNav(BuildContext context, AppLocalizations lang) {
     return Container(
@@ -1806,28 +1786,29 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Stack(
+            clipBehavior: Clip.none, // 🔥 PENTING: biar badge tidak terpotong
             children: [
               Icon(
                 icon,
                 color: isActive ? const Color(0xFF1B3A5C) : const Color(0xFF94A3B8),
-                size: 22,
+                size: 24, // 🔥 Ukuran icon sedikit lebih besar
               ),
               if (badge != null && badge > 0)
                 Positioned(
-                  right: -6,
-                  top: -4,
+                  right: -8, // 🔥 Geser ke kanan
+                  top: -6,   // 🔥 Geser ke atas
                   child: Container(
-                    padding: const EdgeInsets.all(2),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: const BoxDecoration(
                       color: Color(0xFFEF4444),
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
                     ),
-                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                     child: Text(
-                      badge > 9 ? '9+' : '$badge',
+                      badge > 99 ? '99+' : badge > 9 ? '9+' : '$badge',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 8,
+                        fontSize: 9,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
