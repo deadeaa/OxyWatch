@@ -7,8 +7,8 @@ plugins {
 
 android {
     namespace 'com.example.oxywatch'
-    compileSdk 36              // diganti dari 34 -> 36
-    ndkVersion "28.2.13676358" // ditambahkan baris ini
+    compileSdk 36
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -21,8 +21,8 @@ android {
 
     defaultConfig {
         applicationId 'com.example.oxywatch'
-        minSdkVersion flutter.minSdkVersion
-        targetSdk 34               // ini boleh tetap 34, tidak wajib ikut compileSdk
+        minSdkVersion 26
+        targetSdk 36
         versionCode 1
         versionName '1.0'
     }

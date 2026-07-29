@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/ai_scoring_service.dart';
+import '../services/health_service.dart';
 import '../models/risk_score_model.dart';
 import 'emergency_provider.dart';
 import 'auth_provider.dart';
@@ -73,5 +75,64 @@ class MonitoringProvider extends ChangeNotifier {
 
   void simulateEmergency(BuildContext context) {
     updateVitalSigns(89, 162, context);
+  }
+
+  // ============================================================
+  // Health Connect sync (Galaxy Fit3 -> Samsung Health -> Health
+  // Connect -> OxyWatch)
+  // ============================================================
+
+  final HealthService _healthService = HealthService();
+  Timer? _healthSyncTimer;
+  bool _isSyncingHealth = false;
+
+  bool get isSyncingHealth => _isSyncingHealth;
+
+  /// Mulai sinkronisasi berkala dari Health Connect (tiap 5 menit).
+  /// Langsung sync sekali di awal, tidak nunggu 5 menit pertama.
+  Future<void> startHealthSync(BuildContext context) async {
+    _healthSyncTimer?.cancel();
+
+    await _syncFromHealthConnect(context);
+
+    _healthSyncTimer = Timer.periodic(const Duration(minutes: 5), (_) async {
+      await _syncFromHealthConnect(context);
+    });
+  }
+
+  void stopHealthSync() {
+    _healthSyncTimer?.cancel();
+    _healthSyncTimer = null;
+  }
+
+  Future<void> _syncFromHealthConnect(BuildContext context) async {
+    _isSyncingHealth = true;
+    notifyListeners();
+
+    final vitals = await _healthService.getLatestVitals();
+
+    _isSyncingHealth = false;
+
+    if (vitals == null) {
+      // Gagal akses Health Connect (izin belum ada / Health Connect
+      // tidak ter-install). Data lama tetap dipertahankan, tidak
+      // ditimpa dengan 0 supaya tidak menampilkan angka salah.
+      notifyListeners();
+      return;
+    }
+
+    final newSpo2 = vitals.spo2 ?? _spo2;
+    final newHeartRate = vitals.heartRate ?? _heartRate;
+
+    if (!context.mounted) return;
+
+    // updateVitalSigns sudah otomatis notifyListeners() di dalamnya
+    updateVitalSigns(newSpo2, newHeartRate, context);
+  }
+
+  @override
+  void dispose() {
+    _healthSyncTimer?.cancel();
+    super.dispose();
   }
 }

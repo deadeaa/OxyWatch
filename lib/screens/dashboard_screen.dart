@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/notifikasi_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/monitoring_provider.dart';
 import '../widgets/patient_card.dart';
 import '../widgets/risk_score_card.dart';
 import '../widgets/trend_chart.dart';
@@ -12,8 +13,30 @@ import '../screens/pengaturan_screen.dart';
 import '../screens/login_screen.dart';
 import '../utils/languages.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Mulai sync Health Connect setelah frame pertama selesai dirender,
+    // supaya context sudah siap dipakai untuk akses provider lain.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<MonitoringProvider>().startHealthSync(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    context.read<MonitoringProvider>().stopHealthSync();
+    super.dispose();
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
@@ -55,6 +78,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final monitoring = context.watch<MonitoringProvider>();
     final lang = AppLocalizations.of(context)!;
     final isProfileEmpty = auth.nama.isEmpty && auth.usia.isEmpty;
 
@@ -147,7 +171,7 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     child: _buildVitalCard(
                       title: lang.spo2,
-                      value: isProfileEmpty ? '-' : '98',
+                      value: isProfileEmpty ? '-' : '${monitoring.spo2}',
                       unit: isProfileEmpty ? '' : '%',
                       status: isProfileEmpty ? lang.belumAdaData : lang.normal,
                       statusColor: isProfileEmpty ? Colors.grey : Colors.green,
@@ -159,7 +183,7 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     child: _buildVitalCard(
                       title: lang.heartRate,
-                      value: isProfileEmpty ? '-' : '105',
+                      value: isProfileEmpty ? '-' : '${monitoring.heartRate}',
                       unit: isProfileEmpty ? '' : 'bpm',
                       status: isProfileEmpty ? lang.belumAdaData : lang.normal,
                       statusColor: isProfileEmpty ? Colors.grey : Colors.green,

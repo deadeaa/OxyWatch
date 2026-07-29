@@ -36,6 +36,11 @@ dependencies:
   intl: ^0.20.2
   shared_preferences: ^2.2.2
 
+  # ==========================
+  # Health Data (Samsung Health / Health Connect)
+  # ==========================
+  health: 13.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
